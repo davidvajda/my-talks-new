@@ -14,8 +14,8 @@ class Database:
         self.connection.execute("""
         CREATE TABLE IF NOT EXISTS users(
         id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL UNIQUE,
-        email TEXT NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
         role TEXT NOT NULL,
         password TEXT NOT NULL,
         salt BLOB NOT NULL
@@ -37,7 +37,7 @@ class Database:
 
         self.connection.commit()
 
-    def create_user(self, name: str, email: str, password: str, role: str):
+    def create_user(self, name: str, email: str, password: str, role: str) -> bool:
         salt = os.urandom(32)
 
         password_hash = hashlib.pbkdf2_hmac(
@@ -47,11 +47,18 @@ class Database:
             100000
         )
 
-        self.connection.execute(
-            "INSERT INTO users (name, email, password, salt, role) VALUES(?, ?, ?, ?, ?);",
-            (name, email, password_hash, salt, role, )
-        )
-        self.connection.commit()
+        try:
+            self.connection.execute(
+                "INSERT INTO users (name, email, password, salt, role) VALUES(?, ?, ?, ?, ?);",
+                (name, email, password_hash, salt, role, )
+            )
+            self.connection.commit()
+            return True
+
+        except Exception as e:
+            print("[ERROR create_user]", e)
+            return False
+      
 
     def check_user(self, name: str, password: str) -> bool:
         cursor = self.connection.cursor()
@@ -83,17 +90,34 @@ class Database:
             return True
         return False
 
-    def create_review(self, autor_id: int, target_id: int, rating: int, review: str):
-        pass
+    def check_email_exists(self, email: str) -> bool:
+        cursor = self.connection.cursor()
+
+        cursor.execute("SELECT * FROM users WHERE email = ?", (email, ))
+        users = cursor.fetchall()
+
+        if not users:
+            return False
+        return True
+
+    def create_review(self, author_id: int, target_id: int, rating: int, review: str) -> bool:
+        try:
+            self.connection.execute(
+                "INSERT INTO reviews (author_id, target_user_id, rating, review) VALUES(?, ?, ?, ?);",
+                (author_id, target_id, rating, review,)
+            )
+            self.connection.commit()
+        
+        except Exception as e:
+            print("[ERROR create_review]", e)
+
+    def get_reviews(self, target_user_id: int) -> list:
+        cursor = self.connection.cursor()
+
+        cursor.execute("SELECT rating, review FROM reviews WHERE target_user_id = ?", (target_user_id, ))
+        reviews = cursor.fetchall()
+
+        return reviews
 
     def connection_close(self):
         self.connection.close()
-
-
-if __name__ == "__main__":
-    db = Database()
-
-    db.create_user("David Vajda", "my-email@gmail.com", "password", "Talkie")
-    print(db.check_user("David Vajda", "password"))
-    print(db.check_user("David", "password"))
-    db.connection_close()

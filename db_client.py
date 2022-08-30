@@ -60,18 +60,18 @@ class Database:
             print("[ERROR create_user]", e) # TODO: log into file
             return -1
       
-    def check_user(self, name: str, password: str) -> bool: # TODO: change to mail
+    def get_user(self, email: str, password: str) -> list:
         cursor = self.connection.cursor()
         cursor.execute(
-            "SELECT * FROM users WHERE name = ?;",
-            (name, )
+            "SELECT * FROM users WHERE email = ?;",
+            (email, )
         )
 
         users = cursor.fetchall()
 
         # if no user with provided name was found, return false
         if not users:
-            return False
+            return []
 
         user = users[0]
 
@@ -87,8 +87,8 @@ class Database:
         )
 
         if user_password_hash == password_hash:
-            return True
-        return False
+            return list(user)[:4]
+        return []
 
     def check_email_exists(self, email: str) -> bool:
         cursor = self.connection.cursor()
@@ -125,4 +125,5 @@ class Database:
 if __name__ == "__main__":
     db = Database()
 
-    db.create_user("dsassasv", "dasassvs@gma.com", "password", "listener")
+    # db.create_user("dsasaaasssasv", "dasasssssssvs@gma.com", "password", "listener")
+    print(db.get_user("dasasssssssvs@gma.com", "password"))

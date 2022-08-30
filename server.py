@@ -3,7 +3,12 @@ from flask import request, render_template, session, abort, redirect, url_for, f
 from functools import wraps
 
 from setup_app import setup_flask_app, setup_socketio_app
-from helper_functions import validate_username, validate_email, validate_password, validate_role
+from helper_functions import (
+    validate_username,
+    validate_email,
+    validate_password,
+    validate_role,
+)
 from decorators import signed_in_only, signed_out_only
 
 from db_client import Database
@@ -18,6 +23,7 @@ SERVER_MESSAGES = {
 app = setup_flask_app()
 sio = setup_socketio_app(app)
 
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -25,6 +31,7 @@ def index():
 
 # func will serve template with GET method and will accept signup form via POST method
 # also it will be possible to GET this page only when signed out
+
 
 @app.route("/signup", methods=["GET", "POST"])
 @signed_out_only
@@ -46,29 +53,47 @@ def signup():
         flash(SERVER_MESSAGES["INVALID_SIGNUP"])
         return redirect(url_for("signup"))
 
-
     db = Database()
 
     if db.check_email_exists(email):
         flash(SERVER_MESSAGES["EMAIL_EXISTS"])
-        db.connection_close() # TODO: make decorator to close connection automatically
+        db.connection_close()  # TODO: make decorator to close connection automatically
         return redirect(url_for("signup"))
 
     user_id = db.create_user(username, email, password, role)
     if user_id == -1:
-        flash("something went wrong") # TODO: custom message in constant
+        flash("something went wrong")  # TODO: custom message in constant
         redirect(url_for("index"))
 
     session["user"] = Person(user_id, username, email, role)
-    db.connection_close() # TODO: make decorator to close connection automatically
-    return redirect(url_for("index"))   
+    db.connection_close()  # TODO: make decorator to close connection automatically
+    return redirect(url_for("index"))
 
 
 # func will serve template with GET method and will accept signin form via POST method
 # also it will be possible to GET this page only when signed out
 @app.route("/signin", methods=["GET", "POST"])
 def signin():
-    return render_template("signin.html")
+    if request.method == "GET":
+        return render_template("signin.html")
+
+    db = Database()
+
+    email = request.form["email"]
+    password = request.form["password"]
+
+    user = db.get_user(email, password)
+
+    if not user:
+        db.connection_close()
+        flash("Unvalid email or password!")  # constatn
+        return redirect(url_for("signin"))
+
+    id_, name_, email_, role_ = user
+    session["user"] = Person(id_, name_, email_, role_)
+    flash("You've been loged in successfully!")
+    db.connection_close()
+    return redirect(url_for("index"))
 
 
 # serves information about a user
@@ -77,10 +102,11 @@ def user_info(username):
     print(str(session["user"]))
     return str(session["user"])
 
+
 @app.route("/signout")
 def signout():
     session.pop("user", None)
-    flash("You've been signed out!") # TODO: constant
+    flash("You've been signed out!")  # TODO: constant
     return redirect(url_for("index"))
 
 

@@ -1,6 +1,17 @@
 {% extends 'wrapper.html' %}
 
 {% block container %}
+
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+    <div class=flashes>
+    {% for message in messages %}
+    <div>{{ message }}</div>
+    {% endfor %}
+    </div>
+{% endif %}
+{% endwith %}
+
 <h1>My Talks</h1>
 <h2>Welcome</h2>
 <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Quaerat alias saepe illum rerum necessitatibus provident

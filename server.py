@@ -1,52 +1,22 @@
-from sre_parse import SPECIAL_CHARS, DIGITS, ASCIILETTERS
-from flask import Flask, request, render_template, session, abort, redirect, url_for
-from flask_socketio import SocketIO
-from flask_session import Session
+from sre_parse import SPECIAL_CHARS
+from flask import request, render_template, session, abort, redirect, url_for, flash
+from functools import wraps
+
+from setup_app import setup_flask_app, setup_socketio_app
+from helper_functions import validate_username, validate_email, validate_password, validate_role
+from decorators import signed_in_only, signed_out_only
 
 from db_client import Database
 from q import Queue
+from person import Person
 
-app = Flask(__name__)
-app.config["SESSION_TYPE"] = "filesystem"
-app.config.from_object(__name__)
-Session(app)
-sio = SocketIO(app)
+SERVER_MESSAGES = {
+    "EMAIL_EXISTS": "E-Mail you've entered has already been signed up. Did you forget your password?",
+    "INVALID_SIGNUP": f"Something went wrong. Be sure to enter a name between 4 to 29 characters and password with a letter, number and a special character: ({SPECIAL_CHARS}).",
+}
 
-
-def validate_username(username):
-    length = len(username)
-    if length > 3 and length < 30:
-        return True
-    return False
-
-
-def validate_password(password):
-    special_char = digit = asci = False
-
-    for char in password:
-        if char in SPECIAL_CHARS:
-            special_char = True
-        if char in DIGITS:
-            digit = True
-        if char in ASCIILETTERS:
-            asci = True
-
-    if all([special_char, digit, asci]):
-        return True
-    return False
-
-
-def validate_email(email):
-    if "@" in email and "." in email:
-        return True
-    return False
-
-
-def validate_role(role):
-    if role == "talkie" or role == "listener":
-        return True
-    return False
-
+app = setup_flask_app()
+sio = setup_socketio_app(app)
 
 @app.route("/")
 def index():
@@ -55,7 +25,9 @@ def index():
 
 # func will serve template with GET method and will accept signup form via POST method
 # also it will be possible to GET this page only when signed out
+
 @app.route("/signup", methods=["GET", "POST"])
+@signed_out_only
 def signup():
     if request.method == "GET":
         return render_template("signup.html")
@@ -71,17 +43,25 @@ def signup():
         or not validate_email(email)
         or not validate_role(role)
     ):
-        return redirect(url_for("signup")) # redirect with some messsage, like unvalid input, be sure to have password with bla bla bla
+        flash(SERVER_MESSAGES["INVALID_SIGNUP"])
+        return redirect(url_for("signup"))
+
 
     db = Database()
 
     if db.check_email_exists(email):
-        return redirect(url_for("signup")) # again some message, email already registered, did you forget your password?
-        
-    if db.create_user(username, email, password, role):
-        return redirect(url_for("index"))
+        flash(SERVER_MESSAGES["EMAIL_EXISTS"])
+        db.connection_close() # TODO: make decorator to close connection automatically
+        return redirect(url_for("signup"))
 
-    return "bla" # in case when user couldn't be created, make some custom OOPS page, with contact form to developers
+    user_id = db.create_user(username, email, password, role)
+    if user_id == -1:
+        flash("something went wrong") # TODO: custom message in constant
+        redirect(url_for("index"))
+
+    session["user"] = Person(user_id, username, email, role)
+    db.connection_close() # TODO: make decorator to close connection automatically
+    return redirect(url_for("index"))   
 
 
 # func will serve template with GET method and will accept signin form via POST method
@@ -94,7 +74,14 @@ def signin():
 # serves information about a user
 @app.route("/info/<username>", methods=["GET"])
 def user_info(username):
-    return "pass"
+    print(str(session["user"]))
+    return str(session["user"])
+
+@app.route("/signout")
+def signout():
+    session.pop("user", None)
+    flash("You've been signed out!") # TODO: constant
+    return redirect(url_for("index"))
 
 
 # get reviews (user_id)

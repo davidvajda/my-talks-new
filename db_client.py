@@ -37,7 +37,8 @@ class Database:
 
         self.connection.commit()
 
-    def create_user(self, name: str, email: str, password: str, role: str) -> bool:
+    def create_user(self, name: str, email: str, password: str, role: str) -> int:
+        """After successfull user creation returns it's ID in the database. On exception -1 is returned."""
         salt = os.urandom(32)
 
         password_hash = hashlib.pbkdf2_hmac(
@@ -48,19 +49,18 @@ class Database:
         )
 
         try:
-            self.connection.execute(
+            result = self.connection.execute(
                 "INSERT INTO users (name, email, password, salt, role) VALUES(?, ?, ?, ?, ?);",
                 (name, email, password_hash, salt, role, )
             )
             self.connection.commit()
-            return True
+            return result.lastrowid
 
         except Exception as e:
-            print("[ERROR create_user]", e)
-            return False
+            print("[ERROR create_user]", e) # TODO: log into file
+            return -1
       
-
-    def check_user(self, name: str, password: str) -> bool:
+    def check_user(self, name: str, password: str) -> bool: # TODO: change to mail
         cursor = self.connection.cursor()
         cursor.execute(
             "SELECT * FROM users WHERE name = ?;",
@@ -121,3 +121,8 @@ class Database:
 
     def connection_close(self):
         self.connection.close()
+
+if __name__ == "__main__":
+    db = Database()
+
+    db.create_user("dsassasv", "dasassvs@gma.com", "password", "listener")

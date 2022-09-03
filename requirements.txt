@@ -2,3 +2,4 @@ flask_socketio
 flask
 sqlite3
 Flask-Session
+eventlet

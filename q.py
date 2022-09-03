@@ -4,7 +4,7 @@ class Queue:
             self.data = data
             self.next = None
 
-    def __init__(self, values):
+    def __init__(self, values: list = []):
         self.front = self.rear = None
         [self.enqueue(value) for value in values]
 
@@ -33,6 +33,21 @@ class Queue:
 
     def is_empty(self):
         return False if self.front else True
+
+    def __str__(self):
+        names = []
+
+        node = self.front
+
+        while True:
+            if not node:
+                break
+
+            names.append(node.data.name)
+            node = node.next
+        
+        return " - ".join(names)
+
 
 if __name__ == "__main__":
     q = Queue(["hi", "my", "name", "is", "david"])

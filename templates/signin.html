@@ -2,20 +2,40 @@
 
 {% block container %}
 
+<div class="signin">
+    <div class="logo">
+        <h1>My Talks</h1>
+    </div>
     {% with messages = get_flashed_messages() %}
     {% if messages %}
-        <div class=flashes>
+    <div class=flashes>
         {% for message in messages %}
         <div>{{ message }}</div>
         {% endfor %}
-        </div>
+    </div>
     {% endif %}
     {% endwith %}
-
-
     <form action="./signin" method="post">
-        E-Mail: <input type="email" name="email" />
-        Password: <input type="password" name="password" />
-        <button type="submit">Sign Ip</button>
+
+        <div class="input email">
+            <label>
+                E-Mail
+            </label>
+            <input type="email" name="email" />
+            <span id="email-message"></span>
+        </div>
+
+        <div class="input password">
+            <label>
+                Password
+            </label>
+            <input type="password" name="password" />
+            <span id="password-message"></span>
+        </div>
+
+        <div class="button">
+            <button type="submit">Sign Up</button>
+        </div>
     </form>
-    {%endblock%}
+</div>
+{%endblock%}

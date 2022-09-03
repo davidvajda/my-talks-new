@@ -1,15 +1,15 @@
 from sre_parse import SPECIAL_CHARS
 from flask import request, render_template, session, abort, redirect, url_for, flash
-from functools import wraps
+from flask_socketio import join_room, close_room, emit
 
-from setup_app import setup_flask_app, setup_socketio_app
+from server_setup import setup_flask_app, setup_socketio_app
 from helper_functions import (
     validate_username,
     validate_email,
     validate_password,
     validate_role,
 )
-from decorators import signed_in_only, signed_out_only
+from decors import signed_in_only, signed_out_only
 
 from db_client import Database
 from q import Queue
@@ -23,10 +23,13 @@ SERVER_MESSAGES = {
 app = setup_flask_app()
 sio = setup_socketio_app(app)
 
+que = Queue()
+rooms = dict()
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    user = session.get("user")
+    return render_template("index.html", user = user)
 
 
 # func will serve template with GET method and will accept signup form via POST method
@@ -73,6 +76,7 @@ def signup():
 # func will serve template with GET method and will accept signin form via POST method
 # also it will be possible to GET this page only when signed out
 @app.route("/signin", methods=["GET", "POST"])
+@signed_out_only
 def signin():
     if request.method == "GET":
         return render_template("signin.html")
@@ -82,6 +86,10 @@ def signin():
     email = request.form["email"]
     password = request.form["password"]
 
+    if not validate_email(email) or not validate_password(password):
+        flash("Unvalid email or password!") # TODO: constant
+        return redirect("signin")
+
     user = db.get_user(email, password)
 
     if not user:
@@ -89,7 +97,7 @@ def signin():
         flash("Unvalid email or password!")  # constatn
         return redirect(url_for("signin"))
 
-    id_, name_, email_, role_ = user
+    id_, name_, email_, role_ = user[:4]
     session["user"] = Person(id_, name_, email_, role_)
     flash("You've been loged in successfully!")
     db.connection_close()
@@ -97,10 +105,9 @@ def signin():
 
 
 # serves information about a user
-@app.route("/info/<username>", methods=["GET"])
-def user_info(username):
-    print(str(session["user"]))
-    return str(session["user"])
+@app.route("/user/<user_id>", methods=["GET"])
+def user_info(user_id):
+    return "user_id"
 
 
 @app.route("/signout")
@@ -109,10 +116,79 @@ def signout():
     flash("You've been signed out!")  # TODO: constant
     return redirect(url_for("index"))
 
+@app.route("/queue")
+@signed_in_only
+def queue():
+    return render_template("queue.html")
 
-# get reviews (user_id)
-# create review (....)
+
+@sio.on("connect")
+def connect():
+    if not session.get("user"):
+        return redirect(url_for("signin"))
+
+
+    user = session["user"]
+    user.set_sid(request.sid)
+
+    print("[SERVER LOG]", f"{user.name} has connected")
+
+    print("q is empty", que.is_empty())
+    if not que.is_empty():
+        print("compare", que.peek().compare_roles(user))
+
+    # if there's opposite role in the front of the queue, pair them and start the chat
+    if que.is_empty() or que.peek().compare_roles(user):
+        que.enqueue(user)
+
+        room_name = "room#" + str(user.sid)
+        join_room(room_name)
+        user.set_room(room_name)
+
+        rooms[room_name] = [user, ]
+
+        emit("enqueued", {"message": "You have been enequeued"}, to=room_name)
+
+    print("------------- QUEUE --------------")
+    print(que)
+
+@sio.on("disconnect")
+def disconnect():
+    user = session.get("user")
+
+    if not user:
+        return
+
+    print("[SERVER LOG]", user.name, "has disconnected")
+
+    room_name = user.room
+    room = rooms.get(room_name)
+
+    if not room:
+        return None
+
+    if len(rooms[room_name]) == 0:
+        close_room(room_name)
+        rooms.pop(room_name)
+
+    else:
+        rooms[room_name].pop(rooms[room_name].index(user))
+        emit("message", {
+            "data": f"{user.name} has left the chat!",
+            "type": "server_message"
+            }, to=room_name)
+
+
+
+@sio.on("message")
+def message(data):
+    print(data)
+        
+
+    
+
+
 
 
 if __name__ == "__main__":
-    sio.run(app, debug=True)
+    sio.run(app)

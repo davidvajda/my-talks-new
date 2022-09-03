@@ -8,6 +8,7 @@ class Database:
         self,
         path: str = "./database/my-talks-database.db"
     ):
+    
         self.connection = sqlite3.connect(path)
 
         # create users table if it doesn't exist yet
@@ -18,7 +19,8 @@ class Database:
         email TEXT NOT NULL UNIQUE,
         role TEXT NOT NULL,
         password TEXT NOT NULL,
-        salt BLOB NOT NULL
+        salt BLOB NOT NULL,
+        image TEXT NULL
         );
         """)
 
@@ -87,7 +89,7 @@ class Database:
         )
 
         if user_password_hash == password_hash:
-            return list(user)[:4]
+            return list(user)
         return []
 
     def check_email_exists(self, email: str) -> bool:
@@ -116,8 +118,15 @@ class Database:
 
         cursor.execute("SELECT rating, review FROM reviews WHERE target_user_id = ?", (target_user_id, ))
         reviews = cursor.fetchall()
+        self.connection_close()
 
         return reviews
+
+    def update_user(self, user_id: int, name: str, role: str, image_url: str) -> bool:
+        cursor = self.connection.cursor()
+        cursor.execute("UPDATE users SET name = ?, role = ?, image = ? WHERE id = ?"), (name, role, image_url, user_id,)
+        self.connection_close()
+        return True
 
     def connection_close(self):
         self.connection.close()
@@ -126,4 +135,4 @@ if __name__ == "__main__":
     db = Database()
 
     # db.create_user("dsasaaasssasv", "dasasssssssvs@gma.com", "password", "listener")
-    print(db.get_user("dasasssssssvs@gma.com", "password"))
+    print(db.get_user("davidvajda1998@gmail.com", "Krivan2023+"))

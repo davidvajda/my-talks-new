@@ -1,23 +1,45 @@
 {% extends 'wrapper.html' %}
-
 {% block container %}
 
-{% with messages = get_flashed_messages() %}
-{% if messages %}
-    <div class=flashes>
-    {% for message in messages %}
-    <div>{{ message }}</div>
-    {% endfor %}
+<div class="home">
+    {% with messages =
+    get_flashed_messages() %} {% if messages %}
+    <div class="flashes">
+        {% for message in messages %}
+        <div>{{ message }}</div>
+        {% endfor %}
     </div>
-{% endif %}
-{% endwith %}
+    {% endif %} {% endwith %}
+    <div class="logo">
+        <h1>My Talks</h1>
+    </div>
+    <div class="header">
+        <h2>
+            Welcome
+            {% if user %}
+                {{ user.name }}
+            {% endif %}
+        </h2>
+    </div>
+    <div class="text welcome-text">
+        <p>
+            Lorem ipsum dolor sit amet consectetur adipisicing elit. Quaerat alias saepe
+            illum rerum necessitatibus provident qui et assumenda nihil quis, tempora
+            excepturi minus a ipsum hic architecto, aut dolorem eius?
+        </p>
+    </div>
+    <div class="buttons homepage">
 
-<h1>My Talks</h1>
-<h2>Welcome</h2>
-<p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Quaerat alias saepe illum rerum necessitatibus provident
-    qui et assumenda nihil quis, tempora excepturi minus a ipsum hic architecto, aut dolorem eius?</p>
-    <p><a href="./signup">Sign Up</a></p>
-    <p><a href="./signin">Sign In</a></p>
-    <p><a href="#">Talk to someone anonymously</a></p>
+        {% if user %}
+            <div class="button"><a href="./queue"><button>Talk to someone</button></a></div>
+            <div class="button"><a href="./signout"><button>Sign Out</button></a></div>
+        {% else %}
+
+            <div class="button"><a href="./signup"><button>Sign Up</button></a></div>
+            <div class="button"><a href="./signin"><button>Sign In</button></a></div>    
+        {% endif %}
+
+        </div>
+</div>
 
 {%endblock%}

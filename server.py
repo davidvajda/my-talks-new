@@ -26,6 +26,15 @@ sio = setup_socketio_app(app)
 que = Queue()
 rooms = dict()
 
+
+def enqueue_user(user: Person) -> None:
+    que.enqueue(user)
+    room_name = "room#" + str(user.sid)
+    join_room(room_name)
+    user.set_room(room_name)
+    rooms[room_name] = [user, ]
+
+
 @app.route("/")
 def index():
     user = session.get("user")
@@ -131,26 +140,40 @@ def connect():
     user = session["user"]
     user.set_sid(request.sid)
 
-    print("[SERVER LOG]", f"{user.name} has connected")
+    print("[SERVER LOG]", f"{user.name} has connected to socketio")
 
-    print("q is empty", que.is_empty())
-    if not que.is_empty():
-        print("compare", que.peek().compare_roles(user))
+    if que.is_empty() or que.peek().compare_roles(user):
+        enqueue_user(user)
+
+        emit("enqueued", {"message": "You have been enequeued"}, to=user.room)
+        print(f"[SERVER LOG] {user.name} has been enqueued as {user.role}")
 
     # if there's opposite role in the front of the queue, pair them and start the chat
-    if que.is_empty() or que.peek().compare_roles(user):
-        que.enqueue(user)
+    else:
+        room_name = None
 
-        room_name = "room#" + str(user.sid)
-        join_room(room_name)
-        user.set_room(room_name)
+        while not que.is_empty():
+            paired_user = que.dequeue()
+            room_name = paired_user.room
 
-        rooms[room_name] = [user, ]
+            if rooms.get(room_name):
+                break
 
-        emit("enqueued", {"message": "You have been enequeued"}, to=room_name)
+        else:
+            # enqueue the user in case he needs to wait for other opposite role user to connect
+            enqueue_user(user)
 
-    print("------------- QUEUE --------------")
-    print(que)
+            emit("enqueued", {"message": "You have been enequeued"}, to=user.room)
+            print(f"[SERVER LOG] {user.name} has been enqueued as {user.role}")
+            return
+
+
+        join_room(room_name) 
+        rooms[room_name].append(user)
+        print(f"[SERVER LOG] {user.name} has joined the {room_name} chat")
+        emit("enqueued", {"message": f"{user.name} has joined the chat"}, to=user.room)
+        return
+
 
 @sio.on("disconnect")
 def disconnect():

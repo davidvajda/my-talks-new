@@ -1,5 +1,58 @@
 {% extends 'wrapper.html' %}
 
 {% block container %}
-chat
+<div>
+    <div id="chat-messages"></div>
+    <div>
+        <input type="text" id="message-input">
+    </div>
+    <div>
+        <button id="send-message">Send Message</button>
+    </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"
+    integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA=="
+    crossorigin="anonymous"></script>
+<script type="text/javascript" charset="utf-8">
+
+    const sendButton = document.getElementById("send-message");
+    const textInput = document.getElementById("message-input");
+    const chatMessages = document.getElementById("chat-messages");
+
+    var socket = io();
+    socket.on('connect', function () {
+        console.log("im connected")
+    });
+
+    const messageElement = (name, text) => {
+        const messageDiv = document.createElement("div")
+        messageDiv.classList.add("chat-message")
+    
+        const nameElement = document.createElement("b")
+        nameElement.textContent = name
+
+        const messageElement = document.createElement("span")
+        messageElement.textContent = text
+    
+        messageDiv.appendChild(nameElement)
+        messageDiv.appendChild(messageElement)
+    
+        return messageDiv
+    }
+
+    sendButton.addEventListener("click", () => {
+        const messageText = textInput.value;
+        textInput.value = "";
+
+        socket.emit("message", { "text": messageText })
+    })
+
+    socket.on("message", (data) => {
+        console.log("received data", data);
+        chatMessages.appendChild(messageElement(data["message_author"], data["message_text"]))
+    })
+
+</script>
 {%endblock%}

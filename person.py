@@ -11,7 +11,7 @@ class Person:
     room: str = None
 
     def __str__(self) -> None:
-        return f"[USER] {self.id} / {self.name} / {self.email} / {self.role}"
+        return f"[USER] {self.id} / {self.name} / {self.email} / {self.role} / {self.sid} / {self.room}"
 
     def set_sid(self, sid: int) -> None:
         self.sid = sid

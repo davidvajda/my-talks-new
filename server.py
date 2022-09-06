@@ -15,6 +15,9 @@ from db_client import Database
 from q import Queue
 from person import Person
 
+
+import datetime
+
 SERVER_MESSAGES = {
     "EMAIL_EXISTS": "E-Mail you've entered has already been signed up. Did you forget your password?",
     "INVALID_SIGNUP": f"Something went wrong. Be sure to enter a name between 4 to 29 characters and password with a letter, number and a special character: ({SPECIAL_CHARS}).",
@@ -26,19 +29,56 @@ sio = setup_socketio_app(app)
 que = Queue()
 rooms = dict()
 
+import datetime
 
-def enqueue_user(user: Person) -> None:
-    que.enqueue(user)
+
+def emit_chat_message(
+    message_text: str = "",
+    message_author: str = "",
+    message_type: str = "chat-message",
+    room: str = "",
+) -> None:
+    if not room:
+        print("[ERROR] emit_chat_message called without room value")
+        raise ValueError(
+            "Function emit_chat_message must have specified room to emit message to."
+        )
+
+    if room not in rooms:
+        print("[ERROR] called room not in the availible rooms")
+        raise ValueError(
+            "Function emit_chat_message tried to send a message to unvalid room."
+        )
+
+    emit(
+        "message",
+        {
+            "message_text": message_text,
+            "message_author": message_author,
+            "message_type": message_type,
+            "date": str(datetime.datetime.now()),
+        },
+        to=room,
+    )
+
+
+def enqueue_user(user: Person) -> Person:
+
     room_name = "room#" + str(user.sid)
     join_room(room_name)
-    user.set_room(room_name)
-    rooms[room_name] = [user, ]
 
+    user.set_room(room_name)
+    rooms[room_name] = [user]
+
+    que.enqueue(user) 
+    session["user"] = user
+
+    return user
 
 @app.route("/")
 def index():
     user = session.get("user")
-    return render_template("index.html", user = user)
+    return render_template("index.html", user=user)
 
 
 # func will serve template with GET method and will accept signup form via POST method
@@ -96,7 +136,7 @@ def signin():
     password = request.form["password"]
 
     if not validate_email(email) or not validate_password(password):
-        flash("Unvalid email or password!") # TODO: constant
+        flash("Unvalid email or password!")  # TODO: constant
         return redirect("signin")
 
     user = db.get_user(email, password)
@@ -114,9 +154,10 @@ def signin():
 
 
 # serves information about a user
-@app.route("/user/<user_id>", methods=["GET"])
-def user_info(user_id):
-    return "user_id"
+@app.route("/user", methods=["GET"])
+def user_info():
+    print(session.get("user"))
+    return str(session.get("user"))
 
 
 @app.route("/signout")
@@ -125,33 +166,39 @@ def signout():
     flash("You've been signed out!")  # TODO: constant
     return redirect(url_for("index"))
 
-@app.route("/queue")
+
+@app.route("/chat")
 @signed_in_only
-def queue():
-    return render_template("queue.html")
+def chat():
+    return render_template("chat.html")
 
 
 @sio.on("connect")
 def connect():
-    if not session.get("user"):
-        return redirect(url_for("signin"))
+    user = session.get("user")
 
+    if not user:
+        return
 
-    user = session["user"]
     user.set_sid(request.sid)
 
     print("[SERVER LOG]", f"{user.name} has connected to socketio")
 
     if que.is_empty() or que.peek().compare_roles(user):
-        enqueue_user(user)
+        user = enqueue_user(user)
 
-        emit("enqueued", {"message": "You have been enequeued"}, to=user.room)
+        emit_chat_message(
+            message_text="You have been enqueued, please wait for someone to connect.",
+            message_type="server-messasge",
+            room=user.room,
+        )
+
         print(f"[SERVER LOG] {user.name} has been enqueued as {user.role}")
+
+        return
 
     # if there's opposite role in the front of the queue, pair them and start the chat
     else:
-        room_name = None
-
         while not que.is_empty():
             paired_user = que.dequeue()
             room_name = paired_user.room
@@ -161,17 +208,26 @@ def connect():
 
         else:
             # enqueue the user in case he needs to wait for other opposite role user to connect
-            enqueue_user(user)
+            user = enqueue_user(user)
 
-            emit("enqueued", {"message": "You have been enequeued"}, to=user.room)
+            emit_chat_message(
+                message_text="You have been enqueued, please wait for someone to connect.",
+                message_type="server-messasge",
+                room=room_name,
+            )
             print(f"[SERVER LOG] {user.name} has been enqueued as {user.role}")
             return
 
-
-        join_room(room_name) 
+        join_room(room_name)
+        user.set_room(room_name)
         rooms[room_name].append(user)
+
+        emit_chat_message(
+            message_text=f"{user.name} has joined the chat, say hello.",
+            message_type="server-messasge",
+            room=user.room,
+        )
         print(f"[SERVER LOG] {user.name} has joined the {room_name} chat")
-        emit("enqueued", {"message": f"{user.name} has joined the chat"}, to=user.room)
         return
 
 
@@ -190,28 +246,37 @@ def disconnect():
     if not room:
         return None
 
-    if len(rooms[room_name]) == 0:
-        close_room(room_name)
+    if len(rooms[room_name]) < 2:
         rooms.pop(room_name)
+        close_room(room_name)
+
+        print("[SERVER LOG] closing room", room_name)
 
     else:
         rooms[room_name].pop(rooms[room_name].index(user))
-        emit("message", {
-            "data": f"{user.name} has left the chat!",
-            "type": "server_message"
-            }, to=room_name)
-
+        emit_chat_message(
+            message_text=f"{user.name} has disconnected!",
+            message_type="server-messasge",
+            room=user.room,
+        )
 
 
 @sio.on("message")
 def message(data):
-    print(data)
-        
+    user = session.get("user")
 
-    
+    if not user:
+        return
 
+    message_text = data.get("text") if data.get("text") else ""
+    message_author = user.name
+    room = user.room
 
+    emit_chat_message(
+        message_text=message_text, message_author=message_author, room=room
+    )
+    print("[CHAT MESSAGE]", message_author, message_text)
 
 
 if __name__ == "__main__":
-    sio.run(app)
+    sio.run(app, debug=False)

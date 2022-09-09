@@ -102,6 +102,16 @@ class Database:
             return False
         return True
 
+    def get_user_by_id(self, id: int) -> tuple:
+        cursor = self.connection.cursor()
+
+        cursor.execute("SELECT id, name, role, image FROM users WHERE id = ?", (id, ))
+        users = cursor.fetchall()
+
+        if not users:
+            return ()
+        return users[0]
+
     def create_review(self, author_id: int, target_id: int, rating: int, review: str) -> bool:
         try:
             self.connection.execute(

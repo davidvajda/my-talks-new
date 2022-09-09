@@ -62,18 +62,16 @@ def emit_chat_message(
     )
 
 
-def enqueue_user(user: Person) -> Person:
+def enqueue_user():
 
-    room_name = "room#" + str(user.sid)
+    room_name = "room#" + str(session["user"].sid)
     join_room(room_name)
 
-    user.set_room(room_name)
-    rooms[room_name] = [user]
+    session["user"].set_room(room_name)
+    rooms[room_name] = [session["user"]]
 
-    que.enqueue(user) 
-    session["user"] = user
+    que.enqueue(session["user"]) 
 
-    return user
 
 @app.route("/")
 def index():
@@ -175,25 +173,46 @@ def chat():
 
 @sio.on("connect")
 def connect():
-    user = session.get("user")
-
-    if not user:
+    if not session.get("user"):
         return
 
-    user.set_sid(request.sid)
+    # if set false, socket-io app is not able to make changes to session
+    # not sure why it's not set to true automatically, perhaps because I change only dict values
+    session.modified = True
 
-    print("[SERVER LOG]", f"{user.name} has connected to socketio")
+    session["user"].set_sid(request.sid)
+    print("USER -> ", session["user"])
 
-    if que.is_empty() or que.peek().compare_roles(user):
-        user = enqueue_user(user)
+    # in case user refreshed browser they're assigned new sid
+    # i'm sending soom name to the server so they can connect to the same room again
+    old_room_name = session["user"].room 
+    print("[OLD_ROOM_NAME]", session["user"].room)
+
+    if old_room_name and old_room_name in rooms:
+        rooms[old_room_name].append(session["user"])
+        join_room(old_room_name)
+
+        emit_chat_message(
+            message_text=session["user"].name + " has reconnected.",
+            message_type="server-messasge",
+            room=session["user"].room,
+        )
+        # print(f"[SERVER LOG] {user.name} has reconnected")
+        return
+
+    # print("[SERVER LOG]", f"{user.name} has connected to socketio")
+
+    if que.is_empty() or que.peek().compare_roles(session["user"]):
+        enqueue_user()
 
         emit_chat_message(
             message_text="You have been enqueued, please wait for someone to connect.",
             message_type="server-messasge",
-            room=user.room,
+            room=session["user"].room,
         )
 
-        print(f"[SERVER LOG] {user.name} has been enqueued as {user.role}")
+        # print(f"[SERVER LOG] {user.name} has been enqueued as {user.role}")
+        print("enqueued -> ", session["user"])
 
         return
 
@@ -208,75 +227,74 @@ def connect():
 
         else:
             # enqueue the user in case he needs to wait for other opposite role user to connect
-            user = enqueue_user(user)
+            enqueue_user()
 
             emit_chat_message(
                 message_text="You have been enqueued, please wait for someone to connect.",
                 message_type="server-messasge",
-                room=room_name,
+                room=session["user"].room,
             )
-            print(f"[SERVER LOG] {user.name} has been enqueued as {user.role}")
+            print("enqueued -> ", session["user"])
+            # print(f"[SERVER LOG] {user.name} has been enqueued as {user.role}")
             return
 
         join_room(room_name)
-        user.set_room(room_name)
-        rooms[room_name].append(user)
+        session["user"].set_room(room_name)
+        rooms[room_name].append(session["user"])
 
         emit_chat_message(
-            message_text=f"{user.name} has joined the chat, say hello.",
+            message_text= session["user"].name + " has joined the chat, say hello.",
             message_type="server-messasge",
-            room=user.room,
+            room=session["user"].room,
         )
-        print(f"[SERVER LOG] {user.name} has joined the {room_name} chat")
+        print("room joined -> ", session["user"])
+        # print(f"[SERVER LOG] {user.name} has joined the {room_name} chat")
         return
 
 
 @sio.on("disconnect")
-def disconnect():
-    user = session.get("user")
-
-    if not user:
+def disconnect():   
+    if not session.get("user"):
         return
 
-    print("[SERVER LOG]", user.name, "has disconnected")
+    print("[SERVER LOG]", session["user"].name, "has disconnected")
 
-    room_name = user.room
+    room_name = session["user"].room
     room = rooms.get(room_name)
 
     if not room:
         return None
 
-    if len(rooms[room_name]) < 2:
+    if len(rooms[room_name]) <= 1:
         rooms.pop(room_name)
         close_room(room_name)
 
         print("[SERVER LOG] closing room", room_name)
 
     else:
-        rooms[room_name].pop(rooms[room_name].index(user))
+        rooms[room_name].pop(rooms[room_name].index(session["user"]))
         emit_chat_message(
-            message_text=f"{user.name} has disconnected!",
+            message_text= session["user"].name + " has disconnected!",
             message_type="server-messasge",
-            room=user.room,
+            room=session["user"].room,
         )
 
 
 @sio.on("message")
 def message(data):
-    user = session.get("user")
-
-    if not user:
+    if not session.get("user"):
         return
 
     message_text = data.get("text") if data.get("text") else ""
-    message_author = user.name
-    room = user.room
+    message_author = session["user"].name
+    room = session["user"].room
+
+    print(session["user"])
 
     emit_chat_message(
         message_text=message_text, message_author=message_author, room=room
     )
-    print("[CHAT MESSAGE]", message_author, message_text)
 
 
 if __name__ == "__main__":
-    sio.run(app, debug=False)
+    sio.run(app, debug=True)

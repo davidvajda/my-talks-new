@@ -30,14 +30,7 @@
         const messageDiv = document.createElement("div")
         messageDiv.classList.add("chat-message")
     
-        const nameElement = document.createElement("b")
-        nameElement.textContent = name
-
-        const messageElement = document.createElement("span")
-        messageElement.textContent = text
-    
-        messageDiv.appendChild(nameElement)
-        messageDiv.appendChild(messageElement)
+        messageDiv.innerHTML = "<b>" + name + "</b>" + ": " + text
     
         return messageDiv
     }

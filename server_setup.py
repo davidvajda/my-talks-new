@@ -16,5 +16,5 @@ def setup_flask_app() -> Flask:
 
 def setup_socketio_app(app) -> SocketIO:
 
-    sio = SocketIO(app)
+    sio = SocketIO(app, manage_session=False)
     return sio

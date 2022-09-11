@@ -1,3 +1,4 @@
+from multiprocessing.sharedctypes import Value
 from sre_parse import SPECIAL_CHARS
 from flask import request, render_template, session, redirect, url_for, flash, abort
 from flask_socketio import join_room, close_room, emit
@@ -169,10 +170,37 @@ def signin():
 @app.route("/review", methods=["GET", "POST"])
 @signed_in_only
 def review():
-    if request.method == "GET":
-        return render_template("review.html", user = None)
+    uid_to_review = session.get("uid_to_review")
+    author_id = session["user"].id
 
-    # on post create review
+    if not uid_to_review:
+        return redirect(url_for("index"))
+
+    if request.method == "GET":
+        db = Database()
+        id, name, role, image_url = db.get_user_by_id(uid_to_review)
+        db.connection_close()
+
+        return render_template("review.html", name=name, role=role, image_url=image_url)
+
+    # POST
+    rating = int(request.form["rating"], 10)
+    review = request.form["review"]
+
+    # TODO: validate input here and also on other input like functions
+    
+    if rating < 0 or rating > 5:
+        raise ValueError(f"Unvalid rating value of {rating}, valid range is (int) 0 to 5 inclusive")
+
+    if len(review) > 1000:
+        review = review[:997] + "..."
+
+    db = Database()
+    db.create_review(author_id, uid_to_review, rating, review)
+    db.connection_close()
+
+    flash("Your review was saved.")
+    return redirect(url_for("index"))
 
 # serves information about a user
 @app.route("/user/<id>", methods=["GET"])
@@ -214,6 +242,7 @@ def connect():
     session.modified = True
 
     session["user"].set_sid(request.sid)
+    session["uid_to_review"] = None # setting this to none, so i can avoid rewriting it on every message
 
     # in case user refreshed browser they're assigned new sid
     # i'm sending soom name to the server so they can connect to the same room again
@@ -264,8 +293,6 @@ def connect():
 
         join_room(room_name)
         session["user"].set_room(room_name)
-        session["user"].pair_person(paired_user.id)
-        paired_user.pair_person(session["user"].id)
         rooms[room_name].append(session["user"].id)
 
 
@@ -299,14 +326,17 @@ def leave():
 def message(data):
     message_text = data.get("text") if data.get("text") else ""
     message_author = session["user"].name
-    room = session["user"].room
+    room_name = session["user"].room
+    room = rooms.get(room_name)
 
     emit_chat_message(
-        message_text=message_text, message_author=message_author, room=room
+        message_text=message_text, message_author=message_author, room=room_name
     )
 
-    # TODO: save other user id into session under user_to_review key after other user sends a message
-
+    # saving other user's ID into session to review it later
+    if not session.get("uid_to_review") and room and len(room) > 1:
+        session["uid_to_review"] = room[0] if room[0] != session["user"].id else room[1]
+    
 
 if __name__ == "__main__":
     sio.run(app, debug=True)

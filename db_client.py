@@ -103,6 +103,7 @@ class Database:
         return True
 
     def get_user_by_id(self, id: int) -> tuple:
+        "returns ( id: int, name: str, role: str, image_url: str )"
         cursor = self.connection.cursor()
 
         cursor.execute("SELECT id, name, role, image FROM users WHERE id = ?", (id, ))

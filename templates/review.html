@@ -1,5 +1,40 @@
 {% extends 'wrapper.html' %}
 
 {% block container %}
-rate
+<div class="review">
+    <div class="logo">
+        <h1>My Talks</h1>
+    </div>
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class=flashes>
+        {% for message in messages %}
+        <div>{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+    <form action="./review" method="post">
+        <div class="input rating">
+            <label>
+                Rate your experience
+            </label>
+            <input type="number" name="rating" />
+            <span id="rating-message"></span>
+        </div>
+
+        <div class="input review">
+            <label>
+                Write few words about your talk with {{ name }}
+            </label>
+            <textarea name="review"></textarea>
+            <span id="review-message"></span>
+        </div>
+
+        <div class="button">
+            <button type="submit">Submit review</button>
+        </div>
+    </form>
+</div>
+
 {%endblock%}

@@ -1,45 +1,36 @@
 {% extends 'wrapper.html' %}
 {% block container %}
 
-<div class="home">
-    {% with messages =
-    get_flashed_messages() %} {% if messages %}
-    <div class="flashes">
+<div class="d-flex">
+    <div class="d-flex flex-column">
+        {% with messages =
+        get_flashed_messages() %} {% if messages %}
         {% for message in messages %}
-        <div>{{ message }}</div>
+        <div class="alert alert-primary" role="alert">
+            {{ message }}
+        </div>
         {% endfor %}
-    </div>
-    {% endif %} {% endwith %}
-    <div class="logo">
-        <h1>My Talks</h1>
-    </div>
-    <div class="header">
-        <h2>
-            Welcome
-            {% if user %}
-                {{ user.name }}
-            {% endif %}
-        </h2>
-    </div>
-    <div class="text welcome-text">
-        <p>
-            Lorem ipsum dolor sit amet consectetur adipisicing elit. Quaerat alias saepe
-            illum rerum necessitatibus provident qui et assumenda nihil quis, tempora
-            excepturi minus a ipsum hic architecto, aut dolorem eius?
-        </p>
-    </div>
-    <div class="buttons homepage">
+        {% endif %} {% endwith %}
+        {% if user %}
+        <h1>Welcome {{ user.name }}!</h1>
+        {% else %}
+        <h1>Welcome to talks!</h1>
+        {% endif %}
+        <p>Mental health is equally, if not more important than physical health. Since the beginning of pandemic it's
+            been more difficult to talk things through with other people and let the mental tension go away. This
+            website's purpose is to connect you with a random stranger so you can talk and share your thoughts.</p>
 
         {% if user %}
-            <div class="button"><a href="./chat"><button>Talk to someone</button></a></div>
-            <div class="button"><a href="./signout"><button>Sign Out</button></a></div>
+
+        <a href="/chat"><button class="btn btn-primary">Talk to someone now</button></a>
+
         {% else %}
 
-            <div class="button"><a href="./signup"><button>Sign Up</button></a></div>
-            <div class="button"><a href="./signin"><button>Sign In</button></a></div>    
-        {% endif %}
+        <a href="/signin"><button class="btn btn-primary">Sign In</button></a>
+        <p>Not a member yet? <a href="/signup" class="link-primary">Sign Up now!</a></p>
 
-        </div>
+        {% endif %}
+    </div>
 </div>
 
 {%endblock%}

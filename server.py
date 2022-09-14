@@ -1,4 +1,4 @@
-from multiprocessing.sharedctypes import Value
+from operator import truediv
 from sre_parse import SPECIAL_CHARS
 from flask import request, render_template, session, redirect, url_for, flash, abort
 from flask_socketio import join_room, close_room, emit
@@ -41,13 +41,11 @@ def emit_chat_message(
     room: str = "",
 ) -> None:
     if not room:
-        print("[ERROR] emit_chat_message called without room value")
         raise ValueError(
             "Function emit_chat_message must have specified room to emit message to."
         )
 
     if room not in rooms:
-        print("[ERROR] called room not in the availible rooms")
         raise ValueError(
             "Function emit_chat_message tried to send a message to unvalid room."
         )
@@ -96,7 +94,9 @@ def disconnect_user():
 @app.route("/")
 def index():
     user = session.get("user")
-    return render_template("index.html", user=user)
+    signed_out = True if not user else False 
+
+    return render_template("index.html", user=user, signed_out=signed_out)
 
 
 @app.route("/signup", methods=["GET", "POST"])
@@ -149,21 +149,31 @@ def signin():
     email = request.form["email"]
     password = request.form["password"]
 
-    if not validate_email(email) or not validate_password(password):
-        flash("Unvalid email or password!")  # TODO: constant
+    unvalid = False
+
+    if not validate_email(email):
+        flash("The email you've entered is invalid!")
+        unvalid = True
+        
+    if not validate_password(password):
+        flash("The password you've entered is invalid!")
+        unvalid = True
+
+    if unvalid:
         return redirect("signin")
 
     user = db.get_user(email, password)
 
     if not user:
         db.connection_close()
-        flash("Unvalid email or password!")  # constatn
+        flash("The email and password combination you've entered does not exist!")
         return redirect(url_for("signin"))
 
     id_, name_, email_, role_ = user[:4]
     session["user"] = Person(id_, name_, email_, role_)
-    flash("You've been loged in successfully!")
     db.connection_close()
+
+    flash("You've been loged in successfully!")
     return redirect(url_for("index"))
 
 
@@ -340,3 +350,9 @@ def message(data):
 
 if __name__ == "__main__":
     sio.run(app, debug=True)
+
+    # TODO: write tests
+    # TODO: validate input
+    # TODO: simple profile page / photo / name / role / reviews
+    # TODO: create constant text messages / server messages
+    # TODO: do the frontend

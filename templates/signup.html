@@ -2,58 +2,42 @@
 
 {% block container %}
 
+<div class="d-flex flex-column">
 
-<div class="signup">
-    <div class="logo">
-        <h1>My Talks</h1>
+    {% with messages =
+    get_flashed_messages() %} {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-primary" role="alert">
+        {{ message }}
     </div>
-    {% with messages = get_flashed_messages() %}
-    {% if messages %}
-    <div class=flashes>
-        {% for message in messages %}
-        <div>{{ message }}</div>
-        {% endfor %}
-    </div>
-    {% endif %}
-    {% endwith %}
-    <form action="./signup" method="post">
+    {% endfor %}
+    {% endif %} {% endwith %}
 
-        <div class="input name">
-            <label>
-                Name
-            </label>
-            <input type="text" name="username" />
-            <span id="name-message"></span>
+    <form action="/signup" method="post">
+        <div class="mb-3">
+            <label for="username" class="form-label">Username</label>
+            <input type="text" class="form-control" id="username" aria-describedby="username" name="username">
+            <div id="usernameHelp" class="form-text">Username will be displayed to people you'll have a talk with. Also,
+                you can change it later.</div>
         </div>
+        <div class="mb-3">
+            <label for="email" class="form-label">Email address</label>
+            <input type="email" class="form-control" id="email" aria-describedby="user's email address" name="email">
+            <div id="emailHelp" class="form-text">We pinkly promise we won't send you any spam.</div>
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input type="password" class="form-control" id="password" name="password">
+            <div id="passwordHelp" class="form-text">Choose a secure password with at least one uppercase letter, number
+                and a special character.</div>
+        </div>
+        <select class="form-select mb-3" aria-label="Your role in my talks" name="role">
+            <option value="listener">Listener</option>
+            <option value="talkie">Talkie</option>
+        </select>
+        <div id="roleHelp" class="form-text">Your role in my talks. This can be also changed later.</div>
 
-        <div class="input email">
-            <label>
-                E-Mail
-            </label>
-            <input type="email" name="email" />
-            <span id="email-message"></span>
-        </div>
-
-        <div class="input password">
-            <label>
-                Password
-            </label>
-            <input type="password" name="password" />
-            <span id="password-message"></span>
-        </div>
-
-        <div class="input role">
-            <label for="role">Role</label>
-            <select name="role" id="role">
-                <option value="talkie">Talkie</option>
-                <option value="listener">Listener</option>
-            </select>
-            <span id="email-message"></span>
-        </div>
-
-        <div class="button">
-            <button type="submit">Sign Up</button>
-        </div>
+        <button type="submit" class="btn btn-primary mb-3">Sign In</button>
     </form>
 </div>
 

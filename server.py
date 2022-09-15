@@ -82,7 +82,7 @@ def disconnect_user():
 
         emit_chat_message(
             message_text= session["user"].name + " has disconnected!",
-            message_type="server-messasge",
+            message_type="server-message",
             room=session["user"].room,
         )
 
@@ -254,6 +254,8 @@ def connect():
     session["user"].set_sid(request.sid)
     session["uid_to_review"] = None # setting this to none, so i can avoid rewriting it on every message
 
+    sio.emit("username", {"username": session["user"].name}, to=session["user"].sid)
+
     # in case user refreshed browser they're assigned new sid
     # i'm sending soom name to the server so they can connect to the same room again
     old_room_name = session["user"].room 
@@ -264,7 +266,7 @@ def connect():
 
         emit_chat_message(
             message_text=session["user"].name + " has reconnected.",
-            message_type="server-messasge",
+            message_type="server-message",
             room=session["user"].room,
         )
         return
@@ -274,7 +276,7 @@ def connect():
 
         emit_chat_message(
             message_text="You have been enqueued, please wait for someone to connect.",
-            message_type="server-messasge",
+            message_type="server-message",
             room=session["user"].room,
         )
 
@@ -295,7 +297,7 @@ def connect():
 
             emit_chat_message(
                 message_text="You have been enqueued, please wait for someone to connect.",
-                message_type="server-messasge",
+                message_type="server-message",
                 room=session["user"].room,
             )
 
@@ -308,7 +310,7 @@ def connect():
 
         emit_chat_message(
             message_text= session["user"].name + " has joined the chat, say hello.",
-            message_type="server-messasge",
+            message_type="server-message",
             room=session["user"].room,
         )
         return
@@ -334,10 +336,13 @@ def leave():
 @sio.on("message")
 @signed_in_only
 def message(data):
-    message_text = data.get("text") if data.get("text") else ""
+    message_text = data.get("text")
     message_author = session["user"].name
     room_name = session["user"].room
     room = rooms.get(room_name)
+
+    if not message_text:
+        return
 
     emit_chat_message(
         message_text=message_text, message_author=message_author, room=room_name
@@ -349,7 +354,7 @@ def message(data):
     
 
 if __name__ == "__main__":
-    sio.run(app, debug=True)
+    sio.run(app, debug=True, host="0.0.0.0")
 
     # TODO: write tests
     # TODO: validate input

@@ -2,44 +2,47 @@
 
 {% block container %}
 
-rating
-review
-
-
-<div class="review">
-    <div class="logo">
-        <h1>My Talks</h1>
+<div class="d-flex flex-column">
+    {% with messages =
+    get_flashed_messages() %} {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-primary" role="alert">
+        {{ message }}
     </div>
-    {% with messages = get_flashed_messages() %}
-    {% if messages %}
-    <div class=flashes>
-        {% for message in messages %}
-        <div>{{ message }}</div>
-        {% endfor %}
-    </div>
-    {% endif %}
-    {% endwith %}
-    <form action="./review" method="post">
-        <div class="input rating">
-            <label>
-                Rate your experience
-            </label>
-            <input type="number" name="rating" />
-            <span id="rating-message"></span>
-        </div>
+    {% endfor %}
+    {% endif %} {% endwith %}
 
-        <div class="input review">
-            <label>
-                Write few words about your talk with {{ name }}
-            </label>
-            <textarea name="review"></textarea>
-            <span id="review-message"></span>
+    <form action="/review" method="post">
+        <div class="mb-3">
+            <label for="rating" class="form-label">Rating</label>
+            <input type="number" min="0" max="5" class="form-control" id="rating" aria-describedby="rating"
+                name="rating">
+            <div id="ratingHelp" class="form-text">How would you rate your experience?</div>
         </div>
-
-        <div class="button">
-            <button type="submit">Submit review</button>
+        <div class="mb-3">
+            <label for="review" class="form-label">Review</label>
+            <textarea class="form-control" id="review" rows="3" maxlength="999" name="review"></textarea>
         </div>
+        <div id="reviewHelp" class="form-text">How did the talk go? Did you have a pleasant experience? Feel free to
+            write down few words about your talk.</div>
+        <button type="submit" class="btn btn-primary">Submit the review</button>
     </form>
+
+    <script>
+        const ratingInput = document.getElementById("rating");
+        const reviewInput = document.getElementById("review");
+
+        ratingInput.addEventListener("change", (e) => {
+            const value = parseInt(e.target.value, 10);
+
+            if (value < 0) {
+                ratingInput.value = 0;
+            }
+            if (value > 5) {
+                ratingInput.value = 5;
+            }
+        })
+    </script>
 </div>
 
 {%endblock%}

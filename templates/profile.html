@@ -1,7 +1,59 @@
-https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse1.mm.bing.net%2Fth%3Fid%3DOIP.w97x-00NbwLzL8IJhvC-1gHaHa%26pid%3DApi&f=1
-
 {% extends 'wrapper.html' %}
 
 {% block container %}
+
+<div class="container-sm">
+
+    <div class="card mb-3 p-2" style="max-width: 540px;">
+        <div class="row g-0">
+            <div class="col-md-4">
+                {% if user.image %}
+                <img src={{user.image}} class="img-fluid rounded-start" alt="profile picture">
+                {% else %}
+                <img src="../static/default_image.jpg" class="img-fluid rounded-start" alt="profile picture">
+                {% endif %}
+            </div>
+            <div class="col-md-8">
+                <div class="card-body">
+                    <h5 class="card-title">Name: {{ user.name }}</h5>
+                    <p class="card-text">Role: {{ user.role }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h3>Reviews:</h3>
+
+    <div class="accordion">
+
+
+        {% for i in range(reviews|length) %}
+
+
+        <div class="accordion-item mb-3">
+            <h2 class="accordion-header" id="headingOne">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target={{ '#collapse' ~
+                    i }} aria-expanded="true" aria-controls={{ 'collapse' ~ i }}>
+                    {{ reviewers[i].name }} - {{reviews[i][0] }}/5
+                </button>
+            </h2>
+            <div id={{ 'collapse' ~ i }} {% if i==0 %} class="accordion-collapse collapse show" {% else %}
+                class="accordion-collapse collapse" {% endif %} aria-labelledby="headingOne"
+                data-bs-parent="#accordionExample">
+                {% if reviewers[i].image %}
+                <img class="img-thumbnail" src={{reviewers[i].image}} alt="profile image" />
+                {% else %}
+                <img class="img-thumbnail" src="../static/default_image.jpg" alt="profile image" />
+                {% endif %}
+                <div class="accordion-body">
+                    {{ reviews[i][1] }}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+    </div>
+
+</div>
 
 {%endblock%}

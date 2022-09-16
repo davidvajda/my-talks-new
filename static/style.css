@@ -1,5 +1,5 @@
 .full-height {
-    height: 93vh;
+    min-height: 93vh;
 }
 
 .display-flex {
@@ -15,7 +15,7 @@
 }
 
 .chat-window {
-    height: 85vh;
+    min-height: 85vh;
 
     display: flex;
     flex-direction: column;

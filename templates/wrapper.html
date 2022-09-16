@@ -15,27 +15,36 @@
     <nav class="navbar navbar-expand-lg bg-light">
         <div class="container-sm">
             <a class="navbar-brand" href="/">My Talks</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup"
-                aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
+            
             <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
                 <div class="navbar-nav">
 
-                    {% if signed_out %}
+                    {% if user %}
 
-                    <a class="nav-link" href="/signup">Sign Up</a>
-                    <a class="nav-link" href="/signin">Sign In</a>
+                    <a class="nav-link" href="/signout">Sign Out</a>
+                    <a class="nav-link" href="/profile">Profile</a>
                     
                     {% else %}
                     
-                    <a class="nav-link" href="/signout">Sign Out</a>
-                    <a class="nav-link" href="/user">Profile</a>
+                    <a class="nav-link" href="/signup">Sign Up</a>
+                    <a class="nav-link" href="/signin">Sign In</a>
 
                     {% endif %}
 
                 </div>
             </div>
+
+            {% if chat %}
+            <div>
+                <a href="./review"><button class="btn btn-primary" id="leave-chat-button">Leave chat</button></a>
+            </div>
+            {% endif %}
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup"
+                aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+
         </div>
     </nav>
 

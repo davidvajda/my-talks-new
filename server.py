@@ -1,10 +1,8 @@
-from operator import truediv
 from sre_parse import SPECIAL_CHARS
 from flask import request, render_template, session, redirect, url_for, flash, abort
 from flask_socketio import join_room, close_room, emit
 
 import datetime
-import json
 
 from server_setup import setup_flask_app, setup_socketio_app
 from helper_functions import (
@@ -94,9 +92,7 @@ def disconnect_user():
 @app.route("/")
 def index():
     user = session.get("user")
-    signed_out = True if not user else False 
-
-    return render_template("index.html", user=user, signed_out=signed_out)
+    return render_template("index.html", user=user)
 
 
 @app.route("/signup", methods=["GET", "POST"])
@@ -188,10 +184,10 @@ def review():
 
     if request.method == "GET":
         db = Database()
-        id, name, role, image_url = db.get_user_by_id(uid_to_review)
+        id, name, role, image_url, email = db.get_user_by_id(uid_to_review)
         db.connection_close()
 
-        return render_template("review.html", name=name, role=role, image_url=image_url)
+        return render_template("review.html", name=name, role=role, image_url=image_url, user=session["user"])
 
     # POST
     rating = int(request.form["rating"], 10)
@@ -214,7 +210,8 @@ def review():
 
 # serves information about a user
 @app.route("/user/<id>", methods=["GET"])
-def user_info(id: int = -1):
+@signed_in_only
+def user_info(id: int):
     if not session.get("user"):
         abort(404)
 
@@ -230,6 +227,22 @@ def user_info(id: int = -1):
 
     return str(user)
 
+@app.route("/profile", methods=["GET"])
+@signed_in_only
+def profile():
+    db = Database()
+
+    reviewers = []
+    reviews = db.get_reviews(session["user"].id)
+
+    for review in reviews:
+        id_, name_, role_, image_, email_ = db.get_user_by_id(review[2])
+        reviewer = Person(id_, name_, email_, role_, image_)
+        reviewers.append(reviewer)
+
+    db.connection_close()
+
+    return render_template("profile.html", user=session["user"], reviews=reviews, reviewers=reviewers)
 
 @app.route("/signout")
 def signout():
@@ -241,7 +254,7 @@ def signout():
 @app.route("/chat")
 @signed_in_only
 def chat():
-    return render_template("chat.html")
+    return render_template("chat.html", user=session["user"], chat=True)
 
 
 @sio.on("connect")
@@ -354,7 +367,7 @@ def message(data):
     
 
 if __name__ == "__main__":
-    sio.run(app, debug=True, host="0.0.0.0")
+    sio.run(app, debug=True)
 
     # TODO: write tests
     # TODO: validate input

@@ -7,6 +7,7 @@ class Person:
     email: str
     role: str
 
+    image: str = None
     sid: str = None
     room: str = None
     paired_person_id: int = None

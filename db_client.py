@@ -106,7 +106,7 @@ class Database:
         "returns ( id: int, name: str, role: str, image_url: str )"
         cursor = self.connection.cursor()
 
-        cursor.execute("SELECT id, name, role, image FROM users WHERE id = ?", (id, ))
+        cursor.execute("SELECT id, name, role, image, email FROM users WHERE id = ?", (id, ))
         users = cursor.fetchall()
 
         if not users:
@@ -124,12 +124,13 @@ class Database:
         except Exception as e:
             print("[ERROR create_review]", e)
 
+
     def get_reviews(self, target_user_id: int) -> list:
+        "Returns a list of tuples [(rating: int, review: str, author_id: int), ...]"
         cursor = self.connection.cursor()
 
-        cursor.execute("SELECT rating, review FROM reviews WHERE target_user_id = ?", (target_user_id, ))
+        cursor.execute("SELECT rating, review, author_id FROM reviews WHERE target_user_id = ?", (target_user_id, ))
         reviews = cursor.fetchall()
-        self.connection_close()
 
         return reviews
 

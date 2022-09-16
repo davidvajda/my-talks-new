@@ -19,7 +19,7 @@
 <script type="text/javascript" charset="utf-8">
 
     const sendButton = document.getElementById("send-message-button");
-    // const leaveButton = document.getElementById("leave-button");
+    const leaveButton = document.getElementById("leave-chat-button");
     const textInput = document.getElementById("message-text-input");
     const chatMessages = document.getElementById("chat-messages-window");
 
@@ -79,9 +79,9 @@
         }
     }
 
-    // leaveButton.addEventListener("click", () => {
-    //     socket.emit("leave")
-    // })
+    leaveButton.addEventListener("click", () => {
+        socket.emit("leave")
+    })
 
     socket.on("message", (data) => {
 

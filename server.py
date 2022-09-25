@@ -17,7 +17,6 @@ from db_client import Database
 from q import Queue
 from person import Person
 
-
 import datetime
 
 SERVER_MESSAGES = {
@@ -170,7 +169,7 @@ def signin():
     db.connection_close()
 
     flash("You've been loged in successfully!")
-    return redirect(url_for("index"))
+    return redirect(url_for("index")), 200
 
 
 @app.route("/review", methods=["GET", "POST"])
@@ -256,6 +255,12 @@ def signout():
 def chat():
     return render_template("chat.html", user=session["user"], chat=True)
 
+@app.route("/session")
+def session_test():
+    "Returns contents of session for test purposes"
+    return {
+        "data": dict(session),
+    }, 200
 
 @sio.on("connect")
 @signed_in_only
@@ -371,6 +376,4 @@ if __name__ == "__main__":
 
     # TODO: write tests
     # TODO: validate input
-    # TODO: simple profile page / photo / name / role / reviews
     # TODO: create constant text messages / server messages
-    # TODO: do the frontend

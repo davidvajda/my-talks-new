@@ -3,3 +3,4 @@ flask
 sqlite3
 Flask-Session
 eventlet
+unittest

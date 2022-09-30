@@ -19,11 +19,6 @@ from person import Person
 
 import datetime
 
-SERVER_MESSAGES = {
-    "EMAIL_EXISTS": "E-Mail you've entered has already been signed up. Did you forget your password?",
-    "INVALID_SIGNUP": f"Something went wrong. Be sure to enter a name between 4 to 29 characters and password with a letter, number and a special character: ({SPECIAL_CHARS}).",
-}
-
 app = setup_flask_app()
 sio = setup_socketio_app(app)
 
@@ -35,12 +30,29 @@ def emit_chat_message(
     message_text: str = "",
     message_author: str = "",
     message_type: str = "chat-message",
-    room: str = "",
+    room: str = None,
+    sid: str = None,
 ) -> None:
-    if not room:
+    """Emit a 'message' socketio event. 
+    It is possible to emit to a room or specific sid, if specific sid is provided, message is not send to a room."""
+
+    if not room or not sid:
         raise ValueError(
-            "Function emit_chat_message must have specified room to emit message to."
+            "Function emit_chat_message must have specified room or sid to emit message to."
         )
+
+    if sid:
+        emit(
+            "message",
+            {
+                "message_text": message_text,
+                "message_author": message_author,
+                "message_type": message_type,
+                "date": str(datetime.datetime.now()),
+            },
+            to=sid,
+        )
+        return
 
     if room not in rooms:
         raise ValueError(
@@ -67,26 +79,30 @@ def enqueue_user():
     session["user"].unpair()
     rooms[room_name] = [session["user"].id]
 
-    que.enqueue(session["user"]) 
+    que.enqueue(session["user"])
 
-def disconnect_user():
+
+def disconnect_user(manual_leave: bool = False):
     room_name = session["user"].room
-    
+
     # if someone is still in the toom, pop the disconnected user and send a message to the remaining users
     if len(rooms[room_name]) > 1:
         uid = rooms[room_name].index(session["user"].id)
         rooms[room_name].pop(uid)
 
         emit_chat_message(
-            message_text= session["user"].name + " has disconnected!",
+            message_text=session["user"].name + " has left the chat!"
+            if manual_leave
+            else session["user"].name + " has disconnected!",
             message_type="server-message",
             room=session["user"].room,
         )
 
-    # if there is noone left in the room, close it
+    # if there is none left in the room, close it
     else:
         rooms.pop(room_name)
         close_room(room_name)
+
 
 @app.route("/")
 def index():
@@ -105,30 +121,43 @@ def signup():
     email = request.form["email"]
     role = request.form["role"]
 
-    if (
-        not validate_username(username)
-        or not validate_password(password)
-        or not validate_email(email)
-        or not validate_role(role)
-    ):
-        flash(SERVER_MESSAGES["INVALID_SIGNUP"])
+    unvalid = False
+
+    if not validate_username(username):
+        flash("Be sure to enter a name between 4 to 29 characters!")
+
+    if not validate_email(email):
+        flash("The email you've entered is invalid!")
+        unvalid = True
+
+    if not validate_password(password):
+        flash("The password you've entered is invalid!")
+        flash("Be sure to enter a password with a letter, number and a special character " + SPECIAL_CHARS)
+        unvalid = True
+
+    if not validate_role(role):
+        flash("unvalid role!")
+
+    if unvalid:
         return redirect(url_for("signup"))
 
     db = Database()
 
     if db.check_email_exists(email):
-        flash(SERVER_MESSAGES["EMAIL_EXISTS"])
-        db.connection_close()  # TODO: make decorator to close connection automatically
-        return redirect(url_for("signup"))
+        flash(
+            "E-Mail you've entered has already been signed up."
+        )
+        db.connection_close()
+        return redirect(url_for("signin")), 400
 
     user_id = db.create_user(username, email, password, role)
     if user_id == -1:
-        flash("something went wrong")  # TODO: custom message in constant
+        flash("Oops, something went wrong. Registration attempt was not successfull!")
         redirect(url_for("index"))
 
     session["user"] = Person(user_id, username, email, role)
-    db.connection_close()  # TODO: make decorator to close connection automatically
-    return redirect(url_for("index"))
+    db.connection_close()
+    return redirect(url_for("index")), 200
 
 
 # func will serve template with GET method and will accept signin form via POST method
@@ -149,7 +178,7 @@ def signin():
     if not validate_email(email):
         flash("The email you've entered is invalid!")
         unvalid = True
-        
+
     if not validate_password(password):
         flash("The password you've entered is invalid!")
         unvalid = True
@@ -169,7 +198,7 @@ def signin():
     db.connection_close()
 
     flash("You've been loged in successfully!")
-    return redirect(url_for("index")), 200
+    return redirect(url_for("index"))
 
 
 @app.route("/review", methods=["GET", "POST"])
@@ -186,16 +215,24 @@ def review():
         id, name, role, image_url, email = db.get_user_by_id(uid_to_review)
         db.connection_close()
 
-        return render_template("review.html", name=name, role=role, image_url=image_url, user=session["user"])
+        return render_template(
+            "review.html",
+            name=name,
+            role=role,
+            image_url=image_url,
+            user=session["user"],
+        )
 
     # POST
     rating = int(request.form["rating"], 10)
     review = request.form["review"]
 
-    # TODO: validate input here and also on other input like functions
-    
+    # TODO: validate input
+
     if rating < 0 or rating > 5:
-        raise ValueError(f"Unvalid rating value of {rating}, valid range is (int) 0 to 5 inclusive")
+        raise ValueError(
+            f"Unvalid rating value of {rating}, valid range is (int) 0 to 5 inclusive"
+        )
 
     if len(review) > 1000:
         review = review[:997] + "..."
@@ -206,6 +243,7 @@ def review():
 
     flash("Your review was saved.")
     return redirect(url_for("index"))
+
 
 # serves information about a user
 @app.route("/user/<id>", methods=["GET"])
@@ -226,6 +264,7 @@ def user_info(id: int):
 
     return str(user)
 
+
 @app.route("/profile", methods=["GET"])
 @signed_in_only
 def profile():
@@ -241,12 +280,15 @@ def profile():
 
     db.connection_close()
 
-    return render_template("profile.html", user=session["user"], reviews=reviews, reviewers=reviewers)
+    return render_template(
+        "profile.html", user=session["user"], reviews=reviews, reviewers=reviewers
+    )
+
 
 @app.route("/signout")
 def signout():
     session.pop("user", None)
-    flash("You've been signed out!")  # TODO: constant
+    flash("You've been signed out!")
     return redirect(url_for("index"))
 
 
@@ -255,12 +297,12 @@ def signout():
 def chat():
     return render_template("chat.html", user=session["user"], chat=True)
 
+
 @app.route("/session")
 def session_test():
     "Returns contents of session for test purposes"
-    return {
-        "data": dict(session),
-    }, 200
+    return dict(session), 200
+
 
 @sio.on("connect")
 @signed_in_only
@@ -270,13 +312,15 @@ def connect():
     session.modified = True
 
     session["user"].set_sid(request.sid)
-    session["uid_to_review"] = None # setting this to none, so i can avoid rewriting it on every message
+    session[
+        "uid_to_review"
+    ] = None  # setting this to none, so i can avoid rewriting it on every message
 
     sio.emit("username", {"username": session["user"].name}, to=session["user"].sid)
 
     # in case user refreshed browser they're assigned new sid
     # i'm sending soom name to the server so they can connect to the same room again
-    old_room_name = session["user"].room 
+    old_room_name = session["user"].room
 
     if old_room_name and old_room_name in rooms:
         rooms[old_room_name].append(session["user"].id)
@@ -325,9 +369,10 @@ def connect():
         session["user"].set_room(room_name)
         rooms[room_name].append(session["user"].id)
 
-
+        # TODO: get other user sid and send individual message to him
+        # use /user/<id> for it
         emit_chat_message(
-            message_text= session["user"].name + " has joined the chat, say hello.",
+            message_text=session["user"].name + " has joined the chat, say hello.",
             message_type="server-message",
             room=session["user"].room,
         )
@@ -342,14 +387,16 @@ def disconnect():
 
     disconnect_user()
 
+
 @sio.on("leave")
 @signed_in_only
 def leave():
     if session["user"].room not in rooms:
         return
-    
+
     disconnect_user()
     session["user"].room = None
+
 
 @sio.on("message")
 @signed_in_only
@@ -369,11 +416,9 @@ def message(data):
     # saving other user's ID into session to review it later
     if not session.get("uid_to_review") and room and len(room) > 1:
         session["uid_to_review"] = room[0] if room[0] != session["user"].id else room[1]
-    
+
 
 if __name__ == "__main__":
     sio.run(app, debug=True)
 
     # TODO: write tests
-    # TODO: validate input
-    # TODO: create constant text messages / server messages

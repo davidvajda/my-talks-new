@@ -4,3 +4,4 @@ sqlite3
 Flask-Session
 eventlet
 unittest
+python-dotenv

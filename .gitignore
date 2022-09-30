@@ -1,0 +1,9 @@
+pyvenv.cfg
+__pycache__
+Include
+Lib
+Scripts
+database
+flask_session
+.vscode/
+.env

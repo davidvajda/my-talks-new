@@ -10,7 +10,7 @@ class Person:
     image: str = None
     sid: str = None
     room: str = None
-    paired_person_id: int = None
+    paired_person_sid: int = None
 
     def __str__(self) -> None:
         return f"ID: {self.id}  \nNAME: {self.name} \nMAIL: {self.email} \nROLE: {self.role} \nSID: {self.sid} \nROOM: {self.room} \nPAIRED PERSON {self.paired_person_id}\n"
@@ -27,8 +27,8 @@ class Person:
             return True
         return False
 
-    def pair_person(self, person_id: id) -> None:
-        self.paired_person_id = person_id
+    def pair_person(self, person_sid) -> None:
+        self.paired_person_id = person_sid
 
     def unpair(self) -> None:
         self.paired_person_id = None

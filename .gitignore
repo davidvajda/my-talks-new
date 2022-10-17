@@ -3,7 +3,7 @@ __pycache__
 Include
 Lib
 Scripts
-database
+my-talks-database.db
 flask_session
 .vscode/
 .env

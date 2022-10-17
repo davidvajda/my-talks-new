@@ -6,7 +6,7 @@ import os
 class Database:
     def __init__(
         self,
-        path: str = "./database/my-talks-database.db"
+        path: str = "my-talks-database.db"
     ):
     
         self.connection = sqlite3.connect(path)
@@ -145,6 +145,3 @@ class Database:
 
 if __name__ == "__main__":
     db = Database()
-
-    # db.create_user("dsasaaasssasv", "dasasssssssvs@gma.com", "password", "listener")
-    print(db.get_user("davidvajda1998@gmail.com", "Krivan2023+"))

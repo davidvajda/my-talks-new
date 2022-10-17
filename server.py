@@ -36,7 +36,7 @@ def emit_chat_message(
     """Emit a 'message' socketio event. 
     It is possible to emit to a room or specific sid, if specific sid is provided, message is not send to a room."""
 
-    if not room or not sid:
+    if not room and not sid:
         raise ValueError(
             "Function emit_chat_message must have specified room or sid to emit message to."
         )
@@ -148,7 +148,7 @@ def signup():
             "E-Mail you've entered has already been signed up."
         )
         db.connection_close()
-        return redirect(url_for("signin")), 400
+        return redirect(url_for("signin"))
 
     user_id = db.create_user(username, email, password, role)
     if user_id == -1:
@@ -157,7 +157,7 @@ def signup():
 
     session["user"] = Person(user_id, username, email, role)
     db.connection_close()
-    return redirect(url_for("index")), 200
+    return redirect(url_for("index"))
 
 
 # func will serve template with GET method and will accept signin form via POST method
@@ -227,8 +227,6 @@ def review():
     rating = int(request.form["rating"], 10)
     review = request.form["review"]
 
-    # TODO: validate input
-
     if rating < 0 or rating > 5:
         raise ValueError(
             f"Unvalid rating value of {rating}, valid range is (int) 0 to 5 inclusive"
@@ -243,26 +241,6 @@ def review():
 
     flash("Your review was saved.")
     return redirect(url_for("index"))
-
-
-# serves information about a user
-@app.route("/user/<id>", methods=["GET"])
-@signed_in_only
-def user_info(id: int):
-    if not session.get("user"):
-        abort(404)
-
-    if id == -1:
-        return str(session.get("user"))
-
-    db = Database()
-    user = db.get_user_by_id(id)
-    db.connection_close()
-
-    if not user:
-        abort(404)
-
-    return str(user)
 
 
 @app.route("/profile", methods=["GET"])
@@ -316,7 +294,8 @@ def connect():
         "uid_to_review"
     ] = None  # setting this to none, so i can avoid rewriting it on every message
 
-    sio.emit("username", {"username": session["user"].name}, to=session["user"].sid)
+    sio.emit("username", {
+             "username": session["user"].name}, to=session["user"].sid)
 
     # in case user refreshed browser they're assigned new sid
     # i'm sending soom name to the server so they can connect to the same room again
@@ -369,10 +348,9 @@ def connect():
         session["user"].set_room(room_name)
         rooms[room_name].append(session["user"].id)
 
-        # TODO: get other user sid and send individual message to him
-        # use /user/<id> for it
         emit_chat_message(
-            message_text=session["user"].name + " has joined the chat, say hello.",
+            message_text=session["user"].name +
+            " has joined the chat, say hello.",
             message_type="server-message",
             room=session["user"].room,
         )

@@ -2,6 +2,7 @@ from sre_parse import SPECIAL_CHARS
 from flask import request, render_template, session, redirect, url_for, flash, abort
 from flask_socketio import join_room, close_room, emit
 
+from collections import namedtuple
 import datetime
 
 from server_setup import setup_flask_app, setup_socketio_app
@@ -19,19 +20,20 @@ from person import Person
 
 import datetime
 
-app = setup_flask_app()
-sio = setup_socketio_app(app)
+app     = setup_flask_app()
+sio     = setup_socketio_app(app)
 
-que = Queue()
-rooms = dict()
+que     = Queue()   # queue contains Person objects
+rooms   = dict()    # rooms contains list of two sids
 
+User_ids = namedtuple("User_ids", ["id", "sid"])
 
 def emit_chat_message(
-    message_text: str = "",
+    message_text: str   = "",
     message_author: str = "",
-    message_type: str = "chat-message",
-    room: str = None,
-    sid: str = None,
+    message_type: str   = "chat-message",
+    room: str           = None,
+    sid: str            = None,
 ) -> None:
     """Emit a 'message' socketio event. 
     It is possible to emit to a room or specific sid, if specific sid is provided, message is not send to a room."""
@@ -45,10 +47,10 @@ def emit_chat_message(
         emit(
             "message",
             {
-                "message_text": message_text,
-                "message_author": message_author,
-                "message_type": message_type,
-                "date": str(datetime.datetime.now()),
+                "message_text":     message_text,
+                "message_author":   message_author,
+                "message_type":     message_type,
+                "date":             str(datetime.datetime.now()),
             },
             to=sid,
         )
@@ -62,10 +64,10 @@ def emit_chat_message(
     emit(
         "message",
         {
-            "message_text": message_text,
-            "message_author": message_author,
-            "message_type": message_type,
-            "date": str(datetime.datetime.now()),
+            "message_text":     message_text,
+            "message_author":   message_author,
+            "message_type":     message_type,
+            "date":             str(datetime.datetime.now()),
         },
         to=room,
     )
@@ -77,7 +79,8 @@ def enqueue_user():
 
     session["user"].set_room(room_name)
     session["user"].unpair()
-    rooms[room_name] = [session["user"].id]
+
+    rooms[room_name] = [User_ids(session["user"].id, session["user"].sid)]
 
     que.enqueue(session["user"])
 
@@ -85,10 +88,11 @@ def enqueue_user():
 def disconnect_user(manual_leave: bool = False):
     room_name = session["user"].room
 
-    # if someone is still in the toom, pop the disconnected user and send a message to the remaining users
+    # if someone is still in the room, pop the disconnected user and send a message to the remaining users
     if len(rooms[room_name]) > 1:
-        uid = rooms[room_name].index(session["user"].id)
-        rooms[room_name].pop(uid)
+        rooms[room_name].pop(
+            0 if rooms[room_name][0].id == session["user"].id else 1
+        )
 
         emit_chat_message(
             message_text=session["user"].name + " has left the chat!"
@@ -294,15 +298,15 @@ def connect():
         "uid_to_review"
     ] = None  # setting this to none, so i can avoid rewriting it on every message
 
+    # sending username to the frontend, messages are differentiated by author of the message
     sio.emit("username", {
              "username": session["user"].name}, to=session["user"].sid)
 
-    # in case user refreshed browser they're assigned new sid
-    # i'm sending soom name to the server so they can connect to the same room again
+    # in case there exists room assigned to the user and it's still alive, restore the connection
     old_room_name = session["user"].room
 
     if old_room_name and old_room_name in rooms:
-        rooms[old_room_name].append(session["user"].id)
+        rooms[old_room_name].append(User_ids(session["user"].id, session["user"].sid))
         join_room(old_room_name)
 
         emit_chat_message(
@@ -312,6 +316,7 @@ def connect():
         )
         return
 
+    # in case there is nobody to connect to
     if que.is_empty() or que.peek().compare_roles(session["user"]):
         enqueue_user()
 
@@ -346,7 +351,7 @@ def connect():
 
         join_room(room_name)
         session["user"].set_room(room_name)
-        rooms[room_name].append(session["user"].id)
+        rooms[room_name].append(User_ids(session["user"].id, session["user"].sid))
 
         emit_chat_message(
             message_text=session["user"].name +
@@ -379,10 +384,10 @@ def leave():
 @sio.on("message")
 @signed_in_only
 def message(data):
-    message_text = data.get("text")
-    message_author = session["user"].name
-    room_name = session["user"].room
-    room = rooms.get(room_name)
+    message_text    = data.get("text")
+    message_author  = session["user"].name
+    room_name       = session["user"].room
+    room            = rooms.get(room_name)
 
     if not message_text:
         return
@@ -393,10 +398,8 @@ def message(data):
 
     # saving other user's ID into session to review it later
     if not session.get("uid_to_review") and room and len(room) > 1:
-        session["uid_to_review"] = room[0] if room[0] != session["user"].id else room[1]
+        session["uid_to_review"] = room[0].id if room[0].id != session["user"].id else room[1].id
 
 
 if __name__ == "__main__":
     sio.run(app, debug=True)
-
-    # TODO: write tests

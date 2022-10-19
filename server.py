@@ -37,7 +37,6 @@ def emit_chat_message(
 ) -> None:
     """Emit a 'message' socketio event. 
     It is possible to emit to a room or specific sid, if specific sid is provided, message is not send to a room."""
-
     if not room and not sid:
         raise ValueError(
             "Function emit_chat_message must have specified room or sid to emit message to."
@@ -306,13 +305,20 @@ def connect():
     old_room_name = session["user"].room
 
     if old_room_name and old_room_name in rooms:
+        other_user_sid = rooms[old_room_name][0].sid
         rooms[old_room_name].append(User_ids(session["user"].id, session["user"].sid))
         join_room(old_room_name)
 
         emit_chat_message(
             message_text=session["user"].name + " has reconnected.",
             message_type="server-message",
-            room=session["user"].room,
+            sid=other_user_sid,
+        )
+
+        emit_chat_message(
+            message_text="You have reconnected!",
+            message_type="server-message",
+            sid=session["user"].sid,
         )
         return
 
@@ -357,8 +363,16 @@ def connect():
             message_text=session["user"].name +
             " has joined the chat, say hello.",
             message_type="server-message",
-            room=session["user"].room,
+            sid=paired_user.sid,
         )
+
+        emit_chat_message(
+            message_text="You are talking to " + paired_user.name + ", say hello!",
+            message_type="server-message",
+            sid=session["user"].sid,
+        )
+
+
         return
 
 

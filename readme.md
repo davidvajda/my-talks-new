@@ -1,5 +1,7 @@
 # My Talks
 My talks is a chat application connecting you with other random stranger. Server is created with Flask-socketio and SQLite and serves jinja templates styled with bootstrap.
+## Demo
+* App demo is hosted on https://my-talks.fly.dev
 ## Content
 When opening the app, you can either sign in or sign up. After either of these your input is validated, and user session is created.
 Hence, you can enter the chat screen where you might wait for someone else to connect.

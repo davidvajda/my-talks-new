@@ -1,4 +1,4 @@
-# fly.toml file generated for my-talks on 2022-10-22T22:10:13+02:00
+# fly.toml file generated for my-talks on 2022-10-22T22:40:58+02:00
 
 app = "my-talks"
 kill_signal = "SIGINT"

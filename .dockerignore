@@ -1,0 +1,10 @@
+# flyctl launch added from .gitignore
+**\pyvenv.cfg
+**\__pycache__
+**\Include
+**\Lib
+**\Scripts
+**\my-talks-database.db
+**\flask_session
+**\.vscode
+**\.env

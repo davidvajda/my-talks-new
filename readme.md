@@ -13,5 +13,5 @@ After pressing leave chat button, you can write few words about your experience.
 2. python server.py
 ## Todo
 * Write unit tests
-* Individual messages to connected/reconnected users
+* Use logger
 

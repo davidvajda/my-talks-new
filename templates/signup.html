@@ -17,28 +17,66 @@
         <div class="mb-3">
             <label for="username" class="form-label">Username</label>
             <input type="text" class="form-control" id="username" aria-describedby="username" name="username">
-            <div id="usernameHelp" class="form-text">Username will be displayed to people you'll have a talk with. Also,
+            <div id="username-help" class="form-text">Username will be displayed to people you'll have a talk with.
+                Also,
                 you can change it later.</div>
+            <div id="username-invalid-feedback" class="invalid-feedback">Invalid username.</div>
         </div>
         <div class="mb-3">
             <label for="email" class="form-label">Email address</label>
             <input type="email" class="form-control" id="email" aria-describedby="user's email address" name="email">
-            <div id="emailHelp" class="form-text">We pinkly promise we won't send you any spam.</div>
+            <div id="email-help" class="form-text">We pinkly promise we won't send you any spam.</div>
+            <div id="email-invalid-feedback" class="invalid-feedback">Invalid e-mail</div>
         </div>
         <div class="mb-3">
             <label for="password" class="form-label">Password</label>
             <input type="password" class="form-control" id="password" name="password">
-            <div id="passwordHelp" class="form-text">Choose a secure password with at least one uppercase letter, number
+            <div id="password-help" class="form-text">Choose a secure password with at least one uppercase letter,
+                number
                 and a special character.</div>
+            <div id="password-invalid-feedback" class="invalid-feedback">Invalid password</div>
         </div>
-        <select class="form-select mb-3" aria-label="Your role in my talks" name="role">
+        <select class="form-select mb-3" aria-label="Your role in my talks" name="role" id="role">
             <option value="listener">Listener</option>
             <option value="talkie">Talkie</option>
         </select>
-        <div id="roleHelp" class="form-text">Your role in my talks. This can be also changed later.</div>
+        <div id="role-help" class="form-text">Your role in my talks. This can be also changed later.</div>
+        <div id="role-invalid-feedback" class="invalid-feedback">Invalid role</div>
 
         <button type="submit" class="btn btn-primary mb-3">Sign In</button>
     </form>
+    {% block javascript %}
+    <script>
+        const username = {{ username | default({}) | tojson }}
+        const password = {{ password | default({}) | tojson }}
+        const email = {{ email | default({}) | tojson }}
+        const role = {{ role | default({"value": "listener"}) | tojson }}
+
+        const objects = [username, password, email, role]
+        const ids = ["username", "password", "email", "role"]
+
+        for (let i = 0; i < ids.length; i++) {
+            const targetId = ids[i];
+            let value = ""
+
+            if (objects[i]["value"]) {
+                value = objects[i]["value"]
+            }
+
+            console.log(value)
+            document.getElementById(ids[i]).value = value
+
+            if (!objects[i]["error"]) {
+                continue;
+            }
+
+            document.getElementById(`${targetId}-help`).style.display = "none";
+            document.getElementById(targetId).classList.add("is-invalid")
+            document.getElementById(`${targetId}-invalid-feedback`).innerHTML = objects[i]["error_message"]
+        }
+
+    </script>
+    {% endblock %}
 </div>
 
 {%endblock%}

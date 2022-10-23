@@ -1,5 +1,5 @@
 from sre_parse import SPECIAL_CHARS
-from flask import request, render_template, session, redirect, url_for, flash, abort
+from flask import request, render_template, session, redirect, url_for, flash, json
 from flask_socketio import join_room, close_room, emit
 
 from collections import namedtuple
@@ -20,22 +20,23 @@ from person import Person
 
 import datetime
 
-app     = setup_flask_app()
-sio     = setup_socketio_app(app)
+app = setup_flask_app()
+sio = setup_socketio_app(app)
 
-que     = Queue()   # queue contains Person objects
-rooms   = dict()    # rooms contains list of two sids
+que = Queue()  # queue contains Person objects
+rooms = dict()  # rooms contains list of two sids
 
 User_ids = namedtuple("User_ids", ["id", "sid"])
 
+
 def emit_chat_message(
-    message_text: str   = "",
+    message_text: str = "",
     message_author: str = "",
-    message_type: str   = "chat-message",
-    room: str           = None,
-    sid: str            = None,
+    message_type: str = "chat-message",
+    room: str = None,
+    sid: str = None,
 ) -> None:
-    """Emit a 'message' socketio event. 
+    """Emit a 'message' socketio event.
     It is possible to emit to a room or specific sid, if specific sid is provided, message is not send to a room."""
     if not room and not sid:
         raise ValueError(
@@ -46,10 +47,10 @@ def emit_chat_message(
         emit(
             "message",
             {
-                "message_text":     message_text,
-                "message_author":   message_author,
-                "message_type":     message_type,
-                "date":             str(datetime.datetime.now()),
+                "message_text": message_text,
+                "message_author": message_author,
+                "message_type": message_type,
+                "date": str(datetime.datetime.now()),
             },
             to=sid,
         )
@@ -63,10 +64,10 @@ def emit_chat_message(
     emit(
         "message",
         {
-            "message_text":     message_text,
-            "message_author":   message_author,
-            "message_type":     message_type,
-            "date":             str(datetime.datetime.now()),
+            "message_text": message_text,
+            "message_author": message_author,
+            "message_type": message_type,
+            "date": str(datetime.datetime.now()),
         },
         to=room,
     )
@@ -89,9 +90,7 @@ def disconnect_user(manual_leave: bool = False):
 
     # if someone is still in the room, pop the disconnected user and send a message to the remaining users
     if len(rooms[room_name]) > 1:
-        rooms[room_name].pop(
-            0 if rooms[room_name][0].id == session["user"].id else 1
-        )
+        rooms[room_name].pop(0 if rooms[room_name][0].id == session["user"].id else 1)
 
         emit_chat_message(
             message_text=session["user"].name + " has left the chat!"
@@ -119,46 +118,75 @@ def signup():
     if request.method == "GET":
         return render_template("signup.html")
 
-    username = request.form["username"]
-    password = request.form["password"]
-    email = request.form["email"]
-    role = request.form["role"]
+    username = {
+        "value": request.form["username"],
+        "error": False,
+        "error_message": None,
+    }
+    password = {
+        "value": request.form["password"],
+        "error": False,
+        "error_message": None,
+    }
+    email = {
+        "value": request.form["email"],
+        "error": False,
+        "error_message": None,
+    }
+    role = {
+        "value": request.form["role"],
+        "error": False,
+        "error_message": None,
+    }
 
-    unvalid = False
+    if not validate_username(username["value"]):
+        username["error"] = True
+        username["error_message"] = "Be sure to enter a name between 4 to 29 characters"
 
-    if not validate_username(username):
-        flash("Be sure to enter a name between 4 to 29 characters!")
+    if not validate_email(email["value"]):
+        email["error"] = True
+        email["error_message"] = "Invalid e-mail"
 
-    if not validate_email(email):
-        flash("The email you've entered is invalid!")
-        unvalid = True
+    if not validate_password(password["value"]):
+        password["error"] = True
+        password["error_message"] = (
+            "Be sure to enter a password with a letter, number and a special character "
+            + SPECIAL_CHARS
+        )
 
-    if not validate_password(password):
-        flash("The password you've entered is invalid!")
-        flash("Be sure to enter a password with a letter, number and a special character " + SPECIAL_CHARS)
-        unvalid = True
+    if not validate_role(role["value"]):
+        role["error"] = True
+        role["error_message"] = "Invalid role"
 
-    if not validate_role(role):
-        flash("unvalid role!")
+    if email["error"] == False:
+        db = Database()
+        email_exists = db.check_email_exists(email["value"])
+        db.connection_close()
 
-    if unvalid:
-        return redirect(url_for("signup"))
+        if email_exists:
+            email["error"] = True
+            email["error_message"] = "E-Mail you've entered has already been signed up"
+
+    if any([username["error"], password["error"], email["error"], role["error"]]):
+        password["value"] = None
+        return render_template(
+            "signup.html",
+            username=username,
+            password=password,
+            email=email,
+            role=role,
+        )
 
     db = Database()
 
-    if db.check_email_exists(email):
-        flash(
-            "E-Mail you've entered has already been signed up."
-        )
-        db.connection_close()
-        return redirect(url_for("signin"))
-
-    user_id = db.create_user(username, email, password, role)
+    user_id = db.create_user(
+        username["value"], email["value"], password["value"], role["value"]
+    )
     if user_id == -1:
-        flash("Oops, something went wrong. Registration attempt was not successfull!")
+        flash("Oops, something went wrong. Registration attempt was not successfull.")
         redirect(url_for("index"))
 
-    session["user"] = Person(user_id, username, email, role)
+    session["user"] = Person(user_id, username["value"], email["value"], role["value"])
     db.connection_close()
     return redirect(url_for("index"))
 
@@ -298,8 +326,7 @@ def connect():
     ] = None  # setting this to none, so i can avoid rewriting it on every message
 
     # sending username to the frontend, messages are differentiated by author of the message
-    sio.emit("username", {
-             "username": session["user"].name}, to=session["user"].sid)
+    sio.emit("username", {"username": session["user"].name}, to=session["user"].sid)
 
     # in case there exists room assigned to the user and it's still alive, restore the connection
     old_room_name = session["user"].room
@@ -360,8 +387,7 @@ def connect():
         rooms[room_name].append(User_ids(session["user"].id, session["user"].sid))
 
         emit_chat_message(
-            message_text=session["user"].name +
-            " has joined the chat, say hello.",
+            message_text=session["user"].name + " has joined the chat, say hello.",
             message_type="server-message",
             sid=paired_user.sid,
         )
@@ -396,10 +422,10 @@ def leave():
 @sio.on("message")
 @signed_in_only
 def message(data):
-    message_text    = data.get("text")
-    message_author  = session["user"].name
-    room_name       = session["user"].room
-    room            = rooms.get(room_name)
+    message_text = data.get("text")
+    message_author = session["user"].name
+    room_name = session["user"].room
+    room = rooms.get(room_name)
 
     if not message_text:
         return
@@ -410,9 +436,11 @@ def message(data):
 
     # saving other user's ID into session to review it later
     if not session.get("uid_to_review") and room and len(room) > 1:
-        session["uid_to_review"] = room[0].id if room[0].id != session["user"].id else room[1].id
+        session["uid_to_review"] = (
+            room[0].id if room[0].id != session["user"].id else room[1].id
+        )
 
 
 if __name__ == "__main__":
-    # sio.run(app, debug=True)
-    sio.run(app, host="0.0.0.0", port=8080)
+    sio.run(app, debug=True)
+    # sio.run(app, host="0.0.0.0", port=8080)

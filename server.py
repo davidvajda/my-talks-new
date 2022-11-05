@@ -3,10 +3,9 @@ from flask import request, render_template, session, redirect, url_for, flash, j
 from flask_socketio import join_room, close_room, emit
 
 from collections import namedtuple
-import datetime
 
 from server_setup import setup_flask_app, setup_socketio_app
-from helper_functions import (
+from input_validation import (
     validate_username,
     validate_email,
     validate_password,
@@ -20,14 +19,13 @@ from person import Person
 
 import datetime
 
-app = setup_flask_app()
-sio = setup_socketio_app(app)
+app     = setup_flask_app()
+sio     = setup_socketio_app(app)
 
-que = Queue()  # queue contains Person objects
-rooms = dict()  # rooms contains list of two sids
+que     = Queue()  # queue contains Person objects
+rooms   = dict()  # rooms contains list of two sids
 
 User_ids = namedtuple("User_ids", ["id", "sid"])
-
 
 def emit_chat_message(
     message_text: str = "",
@@ -35,14 +33,11 @@ def emit_chat_message(
     message_type: str = "chat-message",
     room: str = None,
     sid: str = None,
-) -> None:
+) -> bool:
     """Emit a 'message' socketio event.
     It is possible to emit to a room or specific sid, if specific sid is provided, message is not send to a room."""
-    if not room and not sid:
-        raise ValueError(
-            "Function emit_chat_message must have specified room or sid to emit message to."
-        )
 
+    # when session id is provided it has priority over room
     if sid:
         emit(
             "message",
@@ -54,26 +49,24 @@ def emit_chat_message(
             },
             to=sid,
         )
-        return
+        return True
 
-    if room not in rooms:
-        raise ValueError(
-            "Function emit_chat_message tried to send a message to unvalid room."
+    if room and room in rooms:
+        emit(
+            "message",
+            {
+                "message_text": message_text,
+                "message_author": message_author,
+                "message_type": message_type,
+                "date": str(datetime.datetime.now()),
+            },
+            to=room,
         )
-
-    emit(
-        "message",
-        {
-            "message_text": message_text,
-            "message_author": message_author,
-            "message_type": message_type,
-            "date": str(datetime.datetime.now()),
-        },
-        to=room,
-    )
+        return True
+    return False
 
 
-def enqueue_user():
+def enqueue_user() -> None:
     room_name = "room#" + str(session["user"].sid)
     join_room(room_name)
 
@@ -83,9 +76,10 @@ def enqueue_user():
     rooms[room_name] = [User_ids(session["user"].id, session["user"].sid)]
 
     que.enqueue(session["user"])
+    return
 
 
-def disconnect_user(manual_leave: bool = False):
+def disconnect_user(manual_leave: bool = False) -> None:
     room_name = session["user"].room
 
     # if someone is still in the room, pop the disconnected user and send a message to the remaining users
@@ -104,11 +98,13 @@ def disconnect_user(manual_leave: bool = False):
     else:
         rooms.pop(room_name)
         close_room(room_name)
+    return
 
 
 @app.route("/")
 def index():
     user = session.get("user")
+
     return render_template("index.html", user=user)
 
 
@@ -119,22 +115,22 @@ def signup():
         return render_template("signup.html")
 
     username = {
-        "value": request.form["username"],
+        "value": request.form.get("username", None),
         "error": False,
         "error_message": None,
     }
     password = {
-        "value": request.form["password"],
+        "value": request.form.get("password"),
         "error": False,
         "error_message": None,
     }
     email = {
-        "value": request.form["email"],
+        "value": request.form.get("email"),
         "error": False,
         "error_message": None,
     }
     role = {
-        "value": request.form["role"],
+        "value": request.form.get("role"),
         "error": False,
         "error_message": None,
     }
@@ -158,7 +154,7 @@ def signup():
         role["error"] = True
         role["error_message"] = "Invalid role"
 
-    if email["error"] == False:
+    if not email["error"]:
         db = Database()
         email_exists = db.check_email_exists(email["value"])
         db.connection_close()
@@ -167,26 +163,38 @@ def signup():
             email["error"] = True
             email["error_message"] = "E-Mail you've entered has already been signed up"
 
-    if any([username["error"], password["error"], email["error"], role["error"]]):
+    errors = [username["error"], password["error"], email["error"], role["error"]]
+    if any(errors):
         password["value"] = None
-        return render_template(
-            "signup.html",
-            username=username,
-            password=password,
-            email=email,
-            role=role,
-        )
+
+        payload = {
+            "name" : username,
+            "password" : password,
+            "email" : email,
+            "role" : role,
+        }
+        return render_template("signup.html", **payload), 422 if any(errors) else 200
 
     db = Database()
 
-    user_id = db.create_user(
-        username["value"], email["value"], password["value"], role["value"]
-    )
-    if user_id == -1:
-        flash("Oops, something went wrong. Registration attempt was not successfull.")
-        redirect(url_for("index"))
+    user_data = {
+        "name": username["value"],
+        "email": email["value"],
+        "password": password["value"],
+        "role": role["value"]
+    }
 
-    session["user"] = Person(user_id, username["value"], email["value"], role["value"])
+    user_id = db.create_user(**user_data)
+    if user_id == -1:
+        flash("Oops, something went wrong.")
+        flash("Registration attempt was not successful.")
+        redirect(url_for("index"))
+        return
+
+    user_data["id"] = user_id
+    user_data.pop("password")
+
+    session["user"] = Person(**user_data)
     db.connection_close()
     return redirect(url_for("index"))
 
@@ -199,36 +207,56 @@ def signin():
     if request.method == "GET":
         return render_template("signin.html")
 
+    email = {
+        "value": request.form.get("email", None),
+        "error": False,
+        "error_message": None,
+    }
+
+    password = {
+        "value": request.form.get("password", None),
+        "error": False,
+        "error_message": None,
+    }
+
+    print(email)
+    print(password)
+    if not validate_email(email["value"]):
+        email["error"] = True
+        email["error_message"] = "This email is invalid."
+
+    if not validate_password(password["value"]):
+        password["error"] = True
+        password["error_message"] = "The password you've entered is invalid."
+
+    errors = [email["error"], password["error"]]
+
+    if any(errors):
+        password["value"] = None
+        payload = {
+            "email": email,
+            "password": password
+        }
+        return render_template("signin.html", **payload), 422 if any(errors) else 200
+
     db = Database()
-
-    email = request.form["email"]
-    password = request.form["password"]
-
-    unvalid = False
-
-    if not validate_email(email):
-        flash("The email you've entered is invalid!")
-        unvalid = True
-
-    if not validate_password(password):
-        flash("The password you've entered is invalid!")
-        unvalid = True
-
-    if unvalid:
-        return redirect("signin")
-
-    user = db.get_user(email, password)
+    user = db.get_user(email["value"], password["value"])
 
     if not user:
         db.connection_close()
         flash("The email and password combination you've entered does not exist!")
-        return redirect(url_for("signin"))
+        return render_template("signin.html")
 
-    id_, name_, email_, role_ = user[:4]
-    session["user"] = Person(id_, name_, email_, role_)
+    user_data = {
+        "id": user[0],
+        "name": user[1],
+        "email": user[2],
+        "role": user[3]
+    }
+    session["user"] = Person(**user_data)
     db.connection_close()
 
-    flash("You've been loged in successfully!")
+    flash("You've been logged in successfully.")
     return redirect(url_for("index"))
 
 
@@ -246,22 +274,22 @@ def review():
         id, name, role, image_url, email = db.get_user_by_id(uid_to_review)
         db.connection_close()
 
-        return render_template(
-            "review.html",
-            name=name,
-            role=role,
-            image_url=image_url,
-            user=session["user"],
-        )
+        payload = {
+            "name": name,
+            "role": role,
+            "image_url": image_url,
+            "user": session["user"]
+        }
+
+        return render_template("review.html", **payload)
 
     # POST
-    rating = int(request.form["rating"], 10)
-    review = request.form["review"]
+    rating = int(request.form.get("rating", -1), 10)
+    review = request.form.get("review", None)
 
     if rating < 0 or rating > 5:
-        raise ValueError(
-            f"Unvalid rating value of {rating}, valid range is (int) 0 to 5 inclusive"
-        )
+        flash("Unvalid rating.")
+        return redirect(url_for(("redirect")))
 
     if len(review) > 1000:
         review = review[:997] + "..."
@@ -444,3 +472,5 @@ def message(data):
 if __name__ == "__main__":
     sio.run(app, debug=True)
     # sio.run(app, host="0.0.0.0", port=8080)
+
+    # TODO: use logger

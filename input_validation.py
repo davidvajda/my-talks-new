@@ -32,6 +32,6 @@ def validate_email(email: str) -> bool:
 
 
 def validate_role(role: str) -> bool:
-    if role == "talkie" or role == "listener":
+    if role in ["talkie", "listener"]:
         return True
     return False

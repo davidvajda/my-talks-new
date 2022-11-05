@@ -14,16 +14,47 @@
     {% endif %} {% endwith %}
 
     <form action="/signin" method="post">
-        <div class="mb-3">
-          <label for="email" class="form-label">Email address</label>
-          <input type="email" class="form-control" id="email" aria-describedby="user's email address" name="email">
+         <div class="mb-3">
+            <label for="email" class="form-label">Email address</label>
+            <input type="email" class="form-control" id="email" aria-describedby="user's email address" name="email">
+            <div id="email-invalid-feedback" class="invalid-feedback">Invalid e-mail</div>
         </div>
         <div class="mb-3">
-          <label for="password" class="form-label">Password</label>
-          <input type="password" class="form-control" id="password" name="password">
+            <label for="password" class="form-label">Password</label>
+            <input type="password" class="form-control" id="password" name="password">
+            <div id="password-invalid-feedback" class="invalid-feedback">Invalid password</div>
         </div>
         <button type="submit" class="btn btn-primary">Sign In</button>
       </form>
+
+    {% block javascript %}
+    <script>
+        const password = {{ password | default({}) | tojson }}
+        const email = {{ email | default({}) | tojson }}
+
+        const objects = [password, email]
+        const ids = ["password", "email"]
+
+        for (let i = 0; i < ids.length; i++) {
+            const targetId = ids[i];
+            let value = ""
+
+            if (objects[i]["value"]) {
+                value = objects[i]["value"]
+            }
+
+            document.getElementById(ids[i]).value = value
+
+            if (!objects[i]["error"]) {
+                continue;
+            }
+
+            document.getElementById(targetId).classList.add("is-invalid")
+            document.getElementById(`${targetId}-invalid-feedback`).innerHTML = objects[i]["error_message"]
+        }
+
+    </script>
+    {% endblock %}
 </div>
 
 {%endblock%}

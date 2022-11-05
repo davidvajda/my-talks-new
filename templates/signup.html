@@ -47,7 +47,7 @@
     </form>
     {% block javascript %}
     <script>
-        const username = {{ username | default({}) | tojson }}
+        const username = {{ name | default({}) | tojson }}
         const password = {{ password | default({}) | tojson }}
         const email = {{ email | default({}) | tojson }}
         const role = {{ role | default({"value": "listener"}) | tojson }}
@@ -63,7 +63,6 @@
                 value = objects[i]["value"]
             }
 
-            console.log(value)
             document.getElementById(ids[i]).value = value
 
             if (!objects[i]["error"]) {

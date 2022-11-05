@@ -59,7 +59,7 @@ class Database:
             return result.lastrowid
 
         except Exception as e:
-            print("[ERROR create_user]", e) # TODO: log into file
+            print("[ERROR create_user]", e) # TODO: log into file but at the place where you call this function
             return -1
       
     def get_user(self, email: str, password: str) -> list:
@@ -145,3 +145,4 @@ class Database:
 
 if __name__ == "__main__":
     db = Database()
+

@@ -49,11 +49,3 @@ class Queue:
         return " - ".join(names)
 
 
-if __name__ == "__main__":
-    q = Queue(["hi", "my", "name", "is", "david"])
-    
-    while True:
-        val = q.dequeue()
-        print(val)
-        if not val:
-            break

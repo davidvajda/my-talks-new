@@ -18,6 +18,6 @@ After pressing leave chat button, you can write few words about your experience.
 * Use logger
 
 ## Changelog
-* / COMMIT NUMBER HERE / Swithed from vanilla Sqlite to SQLalchemy
-* / COMMIT NUMBER HERE / Changed error message style in forms
+* / 59f1d1f / Swithed from vanilla Sqlite to SQLalchemy
+* / 59f1d1f / Changed error message style in forms
 

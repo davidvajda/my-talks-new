@@ -2,6 +2,7 @@ import sqlite3
 import hashlib
 import os
 
+# Database class replaced with SQLalchemy and few functions
 
 class Database:
     def __init__(

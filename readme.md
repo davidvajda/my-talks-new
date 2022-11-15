@@ -17,3 +17,7 @@ After pressing leave chat button, you can write few words about your experience.
 * Write unit tests
 * Use logger
 
+## Changelog
+* / COMMIT NUMBER HERE / Swithed from vanilla Sqlite to SQLalchemy
+* / COMMIT NUMBER HERE / Changed error message style in forms
+

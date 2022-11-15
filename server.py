@@ -1,10 +1,10 @@
 from sre_parse import SPECIAL_CHARS
-from flask import request, render_template, session, redirect, url_for, flash, json
+from flask import request, render_template, session, redirect, url_for, flash
 from flask_socketio import join_room, close_room, emit
 
 from collections import namedtuple
 
-from server_setup import setup_flask_app, setup_socketio_app
+from server_setup import setup_flask_app, setup_socketio_app, setup_db_app
 from input_validation import (
     validate_username,
     validate_email,
@@ -13,26 +13,57 @@ from input_validation import (
 )
 from decors import signed_in_only, signed_out_only
 
-from db_client import Database
 from q import Queue
 from person import Person
 
+from models import hash_password
+
 import datetime
 
-app     = setup_flask_app()
-sio     = setup_socketio_app(app)
+app = setup_flask_app()
+sio = setup_socketio_app(app)
+sql_db = setup_db_app(app)
 
-que     = Queue()  # queue contains Person objects
-rooms   = dict()  # rooms contains list of two sids
+que = Queue()  # queue contains Person objects
+rooms = dict()  # rooms contains list of two sids
 
 User_ids = namedtuple("User_ids", ["id", "sid"])
 
+# TODO: make models.py separate file
+class User(sql_db.Model):
+    __tablename__ = "users"
+    id = sql_db.Column(sql_db.Integer, primary_key=True)
+    name = sql_db.Column(sql_db.String, nullable=False)
+    email = sql_db.Column(sql_db.String, nullable=False, unique=True)
+    role = sql_db.Column(sql_db.String(8), nullable=False)
+    password = sql_db.Column(sql_db.BLOB, nullable=False)
+    salt = sql_db.Column(sql_db.BLOB, nullable=False)
+    image = sql_db.Column(sql_db.String)
+
+    def __repr__(self):
+        return f"User(id={self.id}, name={self.name}, role={self.role})"
+
+
+class Review(sql_db.Model):
+    __tablename__ = "reviews"
+    id = sql_db.Column(sql_db.Integer, primary_key=True)
+    rating = sql_db.Column(sql_db.Integer, nullable=False)
+    review = sql_db.Column(sql_db.String(999))
+    author_id = sql_db.Column(sql_db.ForeignKey("users.id"))
+    user_id = sql_db.Column(sql_db.ForeignKey("users.id"))
+
+    def __repr__(self):
+        return f"Review(id={self.id}, rating={self.rating}, review={self.review})"
+
+with app.app_context():
+    sql_db.create_all()
+
 def emit_chat_message(
-    message_text: str = "",
-    message_author: str = "",
-    message_type: str = "chat-message",
-    room: str = None,
-    sid: str = None,
+        message_text: str = "",
+        message_author: str = "",
+        message_type: str = "chat-message",
+        room: str = None,
+        sid: str = None,
 ) -> bool:
     """Emit a 'message' socketio event.
     It is possible to emit to a room or specific sid, if specific sid is provided, message is not send to a room."""
@@ -73,6 +104,7 @@ def enqueue_user() -> None:
     session["user"].set_room(room_name)
     session["user"].unpair()
 
+    rooms[room_name] = [User_ids(session["user"].id, session["user"].sid)]
     rooms[room_name] = [User_ids(session["user"].id, session["user"].sid)]
 
     que.enqueue(session["user"])
@@ -146,8 +178,8 @@ def signup():
     if not validate_password(password["value"]):
         password["error"] = True
         password["error_message"] = (
-            "Be sure to enter a password with a letter, number and a special character "
-            + SPECIAL_CHARS
+                "Be sure to enter a password with a letter, number and a special character "
+                + SPECIAL_CHARS
         )
 
     if not validate_role(role["value"]):
@@ -155,11 +187,9 @@ def signup():
         role["error_message"] = "Invalid role"
 
     if not email["error"]:
-        db = Database()
-        email_exists = db.check_email_exists(email["value"])
-        db.connection_close()
+        does_exist = User.query.filter_by(email=email["value"]).first()
 
-        if email_exists:
+        if does_exist:
             email["error"] = True
             email["error_message"] = "E-Mail you've entered has already been signed up"
 
@@ -168,34 +198,38 @@ def signup():
         password["value"] = None
 
         payload = {
-            "name" : username,
-            "password" : password,
-            "email" : email,
-            "role" : role,
+            "name": username,
+            "password": password,
+            "email": email,
+            "role": role,
         }
-        return render_template("signup.html", **payload), 422 if any(errors) else 200
+        return render_template("signup.html", **payload), 422
 
-    db = Database()
-
+    hashed_password, salt = hash_password(password["value"])
     user_data = {
         "name": username["value"],
         "email": email["value"],
-        "password": password["value"],
-        "role": role["value"]
+        "role": role["value"],
+        "password": hashed_password,
+        "salt": salt,
+        "image": None,
     }
 
-    user_id = db.create_user(**user_data)
-    if user_id == -1:
-        flash("Oops, something went wrong.")
-        flash("Registration attempt was not successful.")
-        redirect(url_for("index"))
-        return
+    user = User(**user_data)
 
-    user_data["id"] = user_id
+    user_from_db = User.query.filter_by(email=email["value"]).first()
+    if user_from_db:
+        flash("E-mail already registered.")
+        return render_template("signup.html"), 422
+
+    sql_db.session.add(user)
+    sql_db.session.commit()
+
     user_data.pop("password")
+    user_data.pop("salt")
 
-    session["user"] = Person(**user_data)
-    db.connection_close()
+    # TODO: merge User and Person classes
+    session["user"] = Person(**user_data, id=user.id)
     return redirect(url_for("index"))
 
 
@@ -219,8 +253,6 @@ def signin():
         "error_message": None,
     }
 
-    print(email)
-    print(password)
     if not validate_email(email["value"]):
         email["error"] = True
         email["error_message"] = "This email is invalid."
@@ -237,24 +269,28 @@ def signin():
             "email": email,
             "password": password
         }
-        return render_template("signin.html", **payload), 422 if any(errors) else 200
+        return render_template("signin.html", **payload), 422
 
-    db = Database()
-    user = db.get_user(email["value"], password["value"])
+    def validate_user(user, password) -> bool:
+        if not user:
+            return False
 
-    if not user:
-        db.connection_close()
+        hash, _salt = hash_password(password, user.salt)
+        return True if hash == user.password else False
+
+    user = User.query.filter_by(email=email["value"]).first()
+
+    if not validate_user(user, password["value"]):
         flash("The email and password combination you've entered does not exist!")
         return render_template("signin.html")
 
-    user_data = {
-        "id": user[0],
-        "name": user[1],
-        "email": user[2],
-        "role": user[3]
+    user_data = {  # TODO: merge user and person classes
+        "id": user.id,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role
     }
     session["user"] = Person(**user_data)
-    db.connection_close()
 
     flash("You've been logged in successfully.")
     return redirect(url_for("index"))
@@ -270,14 +306,12 @@ def review():
         return redirect(url_for("index"))
 
     if request.method == "GET":
-        db = Database()
-        id, name, role, image_url, email = db.get_user_by_id(uid_to_review)
-        db.connection_close()
+        user = User.query.get(uid_to_review)
 
         payload = {
-            "name": name,
-            "role": role,
-            "image_url": image_url,
+            "name": user.name,
+            "role": user.role,
+            "image_url": user.image,
             "user": session["user"]
         }
 
@@ -294,9 +328,14 @@ def review():
     if len(review) > 1000:
         review = review[:997] + "..."
 
-    db = Database()
-    db.create_review(author_id, uid_to_review, rating, review)
-    db.connection_close()
+    new_review = Review(
+        rating=rating,
+        review=review,
+        author_id=author_id,
+        user_id=uid_to_review,
+    )
+    sql_db.session.add(new_review)
+    sql_db.session.commit()
 
     flash("Your review was saved.")
     return redirect(url_for("index"))
@@ -305,17 +344,14 @@ def review():
 @app.route("/profile", methods=["GET"])
 @signed_in_only
 def profile():
-    db = Database()
-
     reviewers = []
-    reviews = db.get_reviews(session["user"].id)
+    reviews = Review.query.filter_by(user_id=session["user"].id).all()
 
     for review in reviews:
-        id_, name_, role_, image_, email_ = db.get_user_by_id(review[2])
-        reviewer = Person(id_, name_, email_, role_, image_)
+        # TODO: merge User and Person to one class
+        r = User.query.get(review.id)
+        reviewer = Person(r.id, r.name, r.email, r.role, r.image)
         reviewers.append(reviewer)
-
-    db.connection_close()
 
     return render_template(
         "profile.html", user=session["user"], reviews=reviews, reviewers=reviewers

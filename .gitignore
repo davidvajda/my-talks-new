@@ -4,6 +4,10 @@ Include
 Lib
 Scripts
 my-talks-database.db
+.fly.toml
+.instance
+.pytest_cache
+.idea
 flask_session
 .vscode/
 .env

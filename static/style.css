@@ -3,7 +3,7 @@ form {
 }
 
 .full-height {
-    min-height: 93vh;
+    min-height: calc(95vh - 100px);
 }
 
 .display-flex {
@@ -19,7 +19,7 @@ form {
 }
 
 .chat-window {
-    min-height: 85vh;
+    min-height: calc(95vh - 120px);
 
     display: flex;
     flex-direction: column;
@@ -71,4 +71,9 @@ form {
 
     font-size: small;
     color: #adb5bd;
+}
+
+.btn-primary  {
+    margin-top: .5em;
+    margin-bottom: .5em;
 }

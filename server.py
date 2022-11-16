@@ -114,7 +114,6 @@ def enqueue_user() -> None:
     session["user"].unpair()
 
     rooms[room_name] = [User_ids(session["user"].id, session["user"].sid)]
-    rooms[room_name] = [User_ids(session["user"].id, session["user"].sid)]
 
     que.enqueue(session["user"])
     return
@@ -346,12 +345,7 @@ def profile():
     reviews = Review.query.filter_by(user_id=session["user"].id).all()
 
     for review in reviews:
-        user = User.query.get(review.id)
-
-        if not user:
-            continue
-
-        reviewer = Person(user.jsonify_for_person())
+        reviewer = User.query.get(review.id)
         reviewers.append(reviewer)
 
     return render_template(

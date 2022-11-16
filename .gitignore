@@ -6,7 +6,9 @@ Scripts
 my-talks-database.db
 fly.toml
 .instance
+instance/project.db
 pytest_cache
 flask_session
 vscode/
 env
+.idea

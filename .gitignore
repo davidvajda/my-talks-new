@@ -5,9 +5,8 @@ Lib
 Scripts
 my-talks-database.db
 fly.toml
-instance
+.instance
 pytest_cache
-idea
 flask_session
 vscode/
 env

@@ -40,6 +40,15 @@ class User(sql_db.Model):
     salt = sql_db.Column(sql_db.BLOB, nullable=False)
     image = sql_db.Column(sql_db.String)
 
+    def jsonify_for_person(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "role": self.role,
+            "image": self.image,
+        }
+
     def __repr__(self):
         return f"User(id={self.id}, name={self.name}, role={self.role})"
 
@@ -206,30 +215,25 @@ def signup():
         return render_template("signup.html", **payload), 422
 
     hashed_password, salt = hash_password(password["value"])
-    user_data = {
-        "name": username["value"],
-        "email": email["value"],
-        "role": role["value"],
-        "password": hashed_password,
-        "salt": salt,
-        "image": None,
-    }
-
-    user = User(**user_data)
 
     user_from_db = User.query.filter_by(email=email["value"]).first()
     if user_from_db:
         flash("E-mail already registered.")
         return render_template("signup.html"), 422
 
+    user = User(**{
+        "name": username["value"],
+        "email": email["value"],
+        "role": role["value"],
+        "password": hashed_password,
+        "salt": salt,
+        "image": None,
+    })
+
     sql_db.session.add(user)
     sql_db.session.commit()
 
-    user_data.pop("password")
-    user_data.pop("salt")
-
-    # TODO: merge User and Person classes
-    session["user"] = Person(**user_data, id=user.id)
+    session["user"] = Person(**user.jsonify_for_person())
     return redirect(url_for("index"))
 
 
@@ -284,13 +288,7 @@ def signin():
         flash("The email and password combination you've entered does not exist!")
         return render_template("signin.html")
 
-    user_data = {  # TODO: merge user and person classes
-        "id": user.id,
-        "name": user.name,
-        "email": user.email,
-        "role": user.role
-    }
-    session["user"] = Person(**user_data)
+    session["user"] = Person(**user.jsonify_for_person())
 
     flash("You've been logged in successfully.")
     return redirect(url_for("index"))
@@ -348,15 +346,17 @@ def profile():
     reviews = Review.query.filter_by(user_id=session["user"].id).all()
 
     for review in reviews:
-        # TODO: merge User and Person to one class
-        r = User.query.get(review.id)
-        reviewer = Person(r.id, r.name, r.email, r.role, r.image)
+        user = User.query.get(review.id)
+
+        if not user:
+            continue
+
+        reviewer = Person(user.jsonify_for_person())
         reviewers.append(reviewer)
 
     return render_template(
         "profile.html", user=session["user"], reviews=reviews, reviewers=reviewers
     )
-
 
 @app.route("/signout")
 def signout():

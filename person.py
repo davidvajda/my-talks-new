@@ -15,7 +15,7 @@ class Person:
     def __str__(self) -> None:
         return f"ID: {self.id}  \nNAME: {self.name} \nMAIL: {self.email} \nROLE: {self.role} \nSID: {self.sid} \nROOM: {self.room} \nPAIRED PERSON {self.paired_person_id}\n"
 
-    def jsonify(self) -> dict:
+    def jsonify(self):
         return {
             "id": self.id,
             "name": self.name,
